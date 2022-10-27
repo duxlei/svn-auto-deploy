@@ -1,27 +1,19 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch">
-      <el-form-item label="切换环境" prop="status">
-        <el-select
-          v-model="queryParams.status"
-          placeholder=""
-          clearable
-          style="width: 240px"
-        >
-          <el-option
-            v-for="dict in dict.type.deploy_status"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
+      <el-form-item label="发布环境" prop="status">
+        <el-input
+          :value="$route.meta.title"
+          :disabled="true"
+          style="width: 120px"
+        />
       </el-form-item>
       <el-form-item label="任务名称" prop="roleName">
         <el-input
           v-model="queryParams.roleName"
           placeholder="请输入任务名称"
           clearable
-          style="width: 240px"
+          style="width: 200px"
           @keyup.enter.native="handleQuery"
         />
       </el-form-item>
@@ -30,7 +22,7 @@
           v-model="queryParams.roleKey"
           placeholder="请输入JIRA号"
           clearable
-          style="width: 240px"
+          style="width: 200px"
           @keyup.enter.native="handleQuery"
         />
       </el-form-item>
@@ -39,7 +31,7 @@
           v-model="queryParams.status"
           placeholder="任务状态"
           clearable
-          style="width: 240px"
+          style="width: 120px"
         >
           <el-option
             v-for="dict in dict.type.deploy_status"
@@ -48,6 +40,14 @@
             :value="dict.value"
           />
         </el-select>
+      </el-form-item>
+      <el-form-item label="需求发布周">
+        <el-date-picker
+          v-model="deployWeek"
+          style="width: 130px"
+          type="date"
+          placeholder="选择日期"
+        ></el-date-picker>
       </el-form-item>
       <el-form-item label="创建时间">
         <el-date-picker
@@ -81,103 +81,81 @@
         <el-button
           type="primary"
           plain
-          icon="el-icon-plus"
+          icon="el-icon-menu"
           size="mini"
           @click="handleAdd"
           v-hasPermi="['system:role:add']"
         >新增批量发布任务（导入Excel）</el-button>
       </el-col>
-<!--      <el-col :span="1.5">
-        <el-button
-          type="success"
-          plain
-          icon="el-icon-edit"
-          size="mini"
-          :disabled="single"
-          @click="handleUpdate"
-          v-hasPermi="['system:role:edit']"
-        >修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="danger"
-          plain
-          icon="el-icon-delete"
-          size="mini"
-          :disabled="multiple"
-          @click="handleDelete"
-          v-hasPermi="['system:role:remove']"
-        >删除</el-button>
-      </el-col>
       <el-col :span="1.5">
         <el-button
           type="warning"
-          plain
-          icon="el-icon-download"
+          icon="el-icon-cpu"
           size="mini"
-          @click="handleExport"
-          v-hasPermi="['system:role:export']"
-        >导出</el-button>
-      </el-col>-->
+          @click="handleAdd"
+        >一键发布</el-button>
+      </el-col>
       <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
     <el-table v-loading="loading" :data="roleList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="任务编号" prop="roleId" width="120" />
-      <el-table-column label="任务名称" prop="roleName" :show-overflow-tooltip="true" />
-<!--      <el-table-column label="权限字符" prop="roleKey" :show-overflow-tooltip="true" width="150" />-->
-<!--      <el-table-column label="显示顺序" prop="roleSort" width="100" />-->
+      <el-table-column type="selection" width="50" align="center" />
+      <el-table-column label="JIRA编号" prop="jiraNo" width="120" />
+      <el-table-column label="需求名称" prop="demandName" width="160" :show-overflow-tooltip="true" />
+      <el-table-column label="类型" prop="demandType" width="100" />
+      <el-table-column label="关联业务需求" prop="relateDemand" width="140  " :show-overflow-tooltip="true" />
+      <el-table-column label="责任人" prop="principal" width="100" />
+      <el-table-column label="需求迭代周" prop="abc" width="100">
+        <template slot-scope="scope">
+          <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d}') }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="备注" prop="remark" :show-overflow-tooltip="true" class-name="fixed-width" />
+      <el-table-column label="要编译的DLL" prop="roleName" width="200">
+        <template slot-scope="scope">
+          <el-select
+            multiple
+            collapse-tags
+            v-model="scope.row.dlls"
+            clearable
+            :disabled="!scope.row.editDlls"
+            style="width: 140px;"
+          >
+            <el-option
+              v-for="(item,idx) in ['proc','log','nlvc']"
+              :key="idx"
+              :label="item"
+              :value="item"
+            />
+          </el-select>
+          &nbsp;&nbsp;
+          <el-button type="success" icon="el-icon-check" size="mini" v-if="scope.row.editDlls" circle @click="scope.row.editDlls = !scope.row.editDlls"></el-button>
+          <el-button type="primary" icon="el-icon-edit" size="mini" v-if="!scope.row.editDlls" circle @click="scope.row.editDlls = !scope.row.editDlls"></el-button>
+        </template>
+      </el-table-column>
       <el-table-column label="状态" align="center" width="100">
-<!--        <template slot-scope="scope">
-          <el-switch
-            v-model="scope.row.status"
-            active-value="0"
-            inactive-value="1"
-            @change="handleStatusChange(scope.row)"
-          ></el-switch>
-        </template>-->
         <template slot-scope="scope">
           <dict-tag :options="dict.type.deploy_status" :value="scope.row.status"/>
         </template>
       </el-table-column>
-      <el-table-column label="创建时间" align="center" prop="createTime">
+      <el-table-column label="创建时间" align="center" prop="createTime" width="150">
         <template slot-scope="scope">
           <span>{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" class-name="small-padding" width="180">
         <template slot-scope="scope" v-if="scope.row.roleId !== 1">
           <el-button
             size="mini"
-            type="text"
+            type="warning"
             @click="handleUpdate(scope.row)"
             v-hasPermi="['system:role:edit']"
-          >重新发布</el-button>
+          >发布</el-button>
           <el-button
             size="mini"
-            type="text"
             @click="handleUpdate(scope.row)"
             v-hasPermi="['system:role:edit']"
           >查看详情</el-button>
-          <!--<el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['system:role:remove']"
-          >删除</el-button>
-          <el-dropdown size="mini" @command="(command) => handleCommand(command, scope.row)" v-hasPermi="['system:role:edit']">
-            <span class="el-dropdown-link">
-              <i class="el-icon-d-arrow-right el-icon--right"></i>更多
-            </span>
-            <el-dropdown-menu slot="dropdown">
-              <el-dropdown-item command="handleDataScope" icon="el-icon-circle-check"
-                                v-hasPermi="['system:role:edit']">数据权限</el-dropdown-item>
-              <el-dropdown-item command="handleAuthUser" icon="el-icon-user"
-                                v-hasPermi="['system:role:edit']">分配用户</el-dropdown-item>
-            </el-dropdown-menu>
-          </el-dropdown>-->
         </template>
       </el-table-column>
     </el-table>
@@ -315,22 +293,15 @@ export default {
           "createTime": "2022-10-03 20:16:18",
           "updateBy": null,
           "updateTime": null,
-          "remark": "超级管理员",
-          "params": {},
-          "roleId": 2,
-          "roleName": "JIRA-功能1开发提交",
-          "roleKey": "admin",
-          "roleSort": "1",
-          "dataScope": "1",
-          "menuCheckStrictly": true,
-          "deptCheckStrictly": true,
-          "status": "0",
-          "delFlag": "0",
-          "flag": false,
-          "menuIds": null,
-          "deptIds": null,
-          "permissions": null,
-          "admin": true
+          "remark": "需求信息从JIRA系统导出详情请看JIRA系统任务详情",
+          "dlls": [],
+          "editDlls": false,
+          "jiraNo": "A001-221027",
+          "demandName": "JIRA-功能1开发提交",
+          "demandType": "开发(需求)",
+          "relateDemand": "关联JIRA-A1234",
+          "principal": "小明",
+          "status": "0"
         },
         {
           "searchValue": null,
@@ -338,22 +309,15 @@ export default {
           "createTime": "2022-10-03 20:16:18",
           "updateBy": null,
           "updateTime": null,
-          "remark": "普通角色",
-          "params": {},
-          "roleId": 2,
-          "roleName": "JIRA-功能2开发提交",
-          "roleKey": "common",
-          "roleSort": "2",
-          "dataScope": "2",
-          "menuCheckStrictly": true,
-          "deptCheckStrictly": true,
-          "status": "1",
-          "delFlag": "0",
-          "flag": false,
-          "menuIds": null,
-          "deptIds": null,
-          "permissions": null,
-          "admin": false
+          "remark": "需求信息从JIRA系统导出详情请看JIRA系统任务详情",
+          "dlls": [],
+          "editDlls": false,
+          "jiraNo": "A002-221026",
+          "demandName": "JIRA-功能2开发提交",
+          "demandType": "开发(需求)",
+          "relateDemand": "关联JIRA-A1234",
+          "principal": "大黄",
+          "status": "1"
         }
       ],
       // 弹出层标题
@@ -368,6 +332,7 @@ export default {
       deptNodeAll: false,
       // 日期范围
       dateRange: [],
+      deployWeek: null,
       // 数据范围选项
       dataScopeOptions: [
         {
@@ -426,6 +391,7 @@ export default {
   created() {
     // this.getList();
     this.loading = false;
+    console.log(this.$route.meta.title)
   },
   methods: {
     /** 查询角色列表 */
