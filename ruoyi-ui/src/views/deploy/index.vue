@@ -10,7 +10,7 @@
       </el-form-item>
       <el-form-item label="任务名称" prop="roleName">
         <el-input
-          v-model="queryParams.roleName"
+          v-model="queryParams.demandName"
           placeholder="请输入任务名称"
           clearable
           style="width: 200px"
@@ -19,7 +19,7 @@
       </el-form-item>
       <el-form-item label="JIRA号" prop="roleKey">
         <el-input
-          v-model="queryParams.roleKey"
+          v-model="queryParams.jiraNo"
           placeholder="请输入JIRA号"
           clearable
           style="width: 200px"
@@ -43,15 +43,16 @@
       </el-form-item>
       <el-form-item label="需求发布周">
         <el-date-picker
-          v-model="deployWeek"
+          v-model="queryParams.iterateWeek"
           style="width: 130px"
           type="date"
+          value-format="yyyy-MM-dd"
           placeholder="选择日期"
         ></el-date-picker>
       </el-form-item>
       <el-form-item label="创建时间">
         <el-date-picker
-          v-model="dateRange"
+          v-model="queryParams.dateRange"
           style="width: 240px"
           value-format="yyyy-MM-dd"
           type="daterange"
@@ -98,7 +99,7 @@
       <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="roleList" @selection-change="handleSelectionChange">
+    <el-table v-loading="loading" :data="taskList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="50" align="center" />
       <el-table-column label="JIRA编号" prop="jiraNo" width="120" />
       <el-table-column label="需求名称" prop="demandName" width="160" :show-overflow-tooltip="true" />
@@ -107,29 +108,26 @@
       <el-table-column label="责任人" prop="principal" width="100" />
       <el-table-column label="需求迭代周" prop="abc" width="100">
         <template slot-scope="scope">
-          <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d}') }}</span>
+          <span>{{ parseTime(scope.row.iterateWeek, '{y}-{m}-{d}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="备注" prop="remark" :show-overflow-tooltip="true" class-name="fixed-width" />
-      <el-table-column label="要编译的DLL" prop="roleName" width="200">
+      <el-table-column label="备注" prop="remark" :show-overflow-tooltip="true" width="250" />
+      <el-table-column label="要编译的DLL" prop="roleName" class-name="fixed-width">
         <template slot-scope="scope">
           <el-select
             multiple
-            collapse-tags
             v-model="scope.row.dlls"
-            clearable
             :disabled="!scope.row.editDlls"
-            style="width: 140px;"
           >
             <el-option
-              v-for="(item,idx) in ['proc','log','nlvc']"
-              :key="idx"
-              :label="item"
-              :value="item"
+              v-for="dict in dict.type.out_dll"
+              :key="dict.value"
+              :label="dict.label"
+              :value="dict.value"
             />
           </el-select>
           &nbsp;&nbsp;
-          <el-button type="success" icon="el-icon-check" size="mini" v-if="scope.row.editDlls" circle @click="scope.row.editDlls = !scope.row.editDlls"></el-button>
+          <el-button type="success" icon="el-icon-check" size="mini" v-if="scope.row.editDlls" circle @click="saveDll(scope.row)"></el-button>
           <el-button type="primary" icon="el-icon-edit" size="mini" v-if="!scope.row.editDlls" circle @click="scope.row.editDlls = !scope.row.editDlls"></el-button>
         </template>
       </el-table-column>
@@ -266,11 +264,12 @@
 
 <script>
 import { listRole, getRole, delRole, addRole, updateRole, dataScope, changeRoleStatus, deptTreeSelect } from "@/api/system/role";
+import { listTask, saveDll } from "@/api/deploy";
 import { treeselect as menuTreeselect, roleMenuTreeselect } from "@/api/system/menu";
 
 export default {
   name: "Role",
-  dicts: ['deploy_status'],
+  dicts: ['deploy_status', 'out_dll'],
   data() {
     return {
       // 遮罩层
@@ -285,8 +284,8 @@ export default {
       showSearch: true,
       // 总条数
       total: 0,
-      // 角色表格数据
-      roleList: [
+      // 表格数据
+      taskList: [
         {
           "searchValue": null,
           "createBy": null,
@@ -331,7 +330,6 @@ export default {
       deptExpand: true,
       deptNodeAll: false,
       // 日期范围
-      dateRange: [],
       deployWeek: null,
       // 数据范围选项
       dataScopeOptions: [
@@ -364,8 +362,9 @@ export default {
       queryParams: {
         pageNum: 1,
         pageSize: 10,
-        roleName: undefined,
-        roleKey: undefined,
+        demandName: undefined,
+        dateRange: [],
+        iterateWeek: undefined,
         status: undefined
       },
       // 表单参数
@@ -389,20 +388,31 @@ export default {
     };
   },
   created() {
-    // this.getList();
-    this.loading = false;
+    this.getList();
+    // this.loading = false;
     console.log(this.$route.meta.title)
   },
   methods: {
     /** 查询角色列表 */
     getList() {
+      let that = this
       this.loading = true;
-      listRole(this.addDateRange(this.queryParams, this.dateRange)).then(response => {
-          this.roleList = response.rows;
+      listTask(this.addDateRange(this.queryParams, this.dateRange)).then(response => {
+          this.taskList = response.rows;
           this.total = response.total;
+          this.taskList.forEach(e => {
+            that.$set(e, 'editDlls', false)
+            that.$set(e, 'dlls', e.outDlls.split(","))
+          });
           this.loading = false;
         }
       );
+    },
+    /** 保存更新dll */
+    saveDll(row) {
+      saveDll(row).then(resp => {
+        row.editDlls = !row.editDlls
+      })
     },
     /** 查询菜单树结构 */
     getMenuTreeselect() {
