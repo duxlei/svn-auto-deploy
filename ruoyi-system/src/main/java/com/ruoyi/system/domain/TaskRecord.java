@@ -7,6 +7,8 @@
  */
 package com.ruoyi.system.domain;
 
+import com.ruoyi.common.annotation.Excel;
+
 import java.util.Date;
 
 /**
@@ -16,11 +18,17 @@ import java.util.Date;
  */
 public class TaskRecord {
     private Long id;
+    @Excel(name = "JIRAKEY")
     private String jiraNo;
+    @Excel(name = "名称")
     private String demandName;
+    @Excel(name = "类型")
     private Integer demandType;
+    @Excel(name = "关联业务需求")
     private String relateDemand;
+    @Excel(name = "责任人")
     private String principal;
+    @Excel(name = "备注")
     private String remark;
     private Date iterateWeek;
     private String outDlls;

@@ -20,3 +20,11 @@ export function saveDll(row) {
     params: {id: row.id, outDlls: row.dlls.join(",")}
   })
 }
+
+export function addTask(form) {
+  return request({
+    url: '/deploy/addTask',
+    method: 'post',
+    data: form
+  })
+}

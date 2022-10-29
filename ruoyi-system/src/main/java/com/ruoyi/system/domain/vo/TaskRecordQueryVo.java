@@ -21,6 +21,7 @@ public class TaskRecordQueryVo {
     private Date iterateWeek;
     private Date startTime;
     private Date endTime;
+    private String env;
 
     public String getJiraNo() {
         return jiraNo;
@@ -68,5 +69,13 @@ public class TaskRecordQueryVo {
 
     public void setEndTime(Date endTime) {
         this.endTime = endTime;
+    }
+
+    public String getEnv() {
+        return env;
+    }
+
+    public void setEnv(String env) {
+        this.env = env;
     }
 }
