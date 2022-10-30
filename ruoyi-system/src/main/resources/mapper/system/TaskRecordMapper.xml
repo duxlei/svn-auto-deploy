@@ -27,6 +27,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		select * from task_record
 		<where>
 			<if test="jiraNo != null and jiraNo != ''">jira_no=#{jiraNo}</if>
+			<if test="jiraNoList != null and jiraNoList.size > 0">and jira_no in <foreach collection="jiraNoList" item="jira" open="(" separator="," close=")">#{jira}</foreach></if>
 			<if test="demandName != null and demandName != ''">and demand_name like concat('%',#{demandName},'%')</if>
 			<if test="status != null">and status=#{status}</if>
 			<if test="iterateWeek != null">and iterate_week=#{iterateWeek}</if>
@@ -125,6 +126,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			<if test="updateBy != null and updateBy != ''">update_by=#{updateBy}</if>
 		</set>
 		where id=#{id} limit 1
+	</update>
+
+	<update id="batchUpdate">
+		update task_record set
+			demand_name   =	case <foreach collection="tasks" item="task">when jira_no=#{task.jiraNo} and #{task.demandName} 	IS NOT NULL and #{task.demandName} != '' 	then #{task.demandName}</foreach> 	else demand_name end,
+			demand_type   =	case <foreach collection="tasks" item="task">when jira_no=#{task.jiraNo} and #{task.demandType} 	IS NOT NULL 								then #{task.demandType}</foreach> 	else demand_type end,
+			relate_demand =	case <foreach collection="tasks" item="task">when jira_no=#{task.jiraNo} and #{task.relateDemand} 	IS NOT NULL and #{task.relateDemand} != ''  then #{task.relateDemand}</foreach> else relate_demand end,
+			principal     =	case <foreach collection="tasks" item="task">when jira_no=#{task.jiraNo} and #{task.principal} 		IS NOT NULL and #{task.principal} != '' 	then #{task.principal}</foreach> 	else principal end,
+			remark        =	case <foreach collection="tasks" item="task">when jira_no=#{task.jiraNo} and #{task.remark} 		IS NOT NULL and #{task.remark} != '' 		then #{task.remark}</foreach> 		else remark end,
+			iterate_week  =	case <foreach collection="tasks" item="task">when jira_no=#{task.jiraNo} and #{task.iterateWeek} 	IS NOT NULL 								then #{task.iterateWeek}</foreach> 	else iterate_week end,
+			out_dlls      =	case <foreach collection="tasks" item="task">when jira_no=#{task.jiraNo} and #{task.outDlls} 		IS NOT NULL and #{task.outDlls} != '' 		then #{task.outDlls}</foreach> 		else out_dlls end,
+			status        =	case <foreach collection="tasks" item="task">when jira_no=#{task.jiraNo} and #{task.status} 		IS NOT NULL 								then #{task.status}</foreach> 		else status end,
+			update_by     =	case <foreach collection="tasks" item="task">when jira_no=#{task.jiraNo} and #{task.updateBy} 		IS NOT NULL and #{task.updateBy} != ''		then #{task.updateBy}</foreach> 	else update_by end
+		where jira_no in <foreach collection="tasks" item="task" open="(" separator="," close=")">#{task.jiraNo}</foreach> and env=#{env}
 	</update>
 
 </mapper> 

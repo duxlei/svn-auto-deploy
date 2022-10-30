@@ -8,6 +8,7 @@
 package com.ruoyi.system.domain.vo;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 任务列表查询对象
@@ -16,6 +17,7 @@ import java.util.Date;
  */
 public class TaskRecordQueryVo {
     private String jiraNo;
+    private List<String> jiraNoList;
     private String demandName;
     private Integer status;
     private Date iterateWeek;
@@ -77,5 +79,13 @@ public class TaskRecordQueryVo {
 
     public void setEnv(String env) {
         this.env = env;
+    }
+
+    public List<String> getJiraNoList() {
+        return jiraNoList;
+    }
+
+    public void setJiraNoList(List<String> jiraNoList) {
+        this.jiraNoList = jiraNoList;
     }
 }

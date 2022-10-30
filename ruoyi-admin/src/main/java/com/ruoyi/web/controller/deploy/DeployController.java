@@ -83,7 +83,7 @@ public class DeployController extends BaseController {
             throw new ServiceException("参数错误，导入文件为空！");
         }
         ExcelUtil<TaskRecord> util = new ExcelUtil<>(TaskRecord.class);
-        List<TaskRecord> taskList = util.importExcel(file.getInputStream(), 5);
+        List<TaskRecord> taskList = util.importExcel(file.getInputStream(), 1, 5);
         String createBy = getUsername();
         return toAjax(taskRecordService.importTask(taskList, env, createBy));
     }

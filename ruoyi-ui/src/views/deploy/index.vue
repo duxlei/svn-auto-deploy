@@ -84,7 +84,7 @@
           plain
           icon="el-icon-menu"
           size="mini"
-          @click="handleAdd"
+          @click="openImport = true"
           v-hasPermi="['system:role:add']"
         >新增批量发布任务（导入Excel）</el-button>
       </el-col>
@@ -219,11 +219,38 @@
       </div>
     </el-dialog>
 
+    <!-- 批量导入发布任务对话框 -->
+    <el-dialog title="批量导入发布任务" :visible.sync="openImport" width="400px" append-to-body>
+      <el-form ref="form" :model="formImport" :rules="rules" label-width="100px">
+          <el-upload
+            drag
+            name="file"
+            ref="importTaskUpload"
+            :action="importAction"
+            :auto-upload="false"
+            :multiple="false"
+            :data="formImport"
+            :headers="importHeaders"
+            :on-error="uploadError"
+            :on-success="uploadSuccess"
+            :on-change="selectFileChange">
+            <i class="el-icon-upload"></i>
+            <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+            <div class="el-upload__tip" slot="tip">只能上传 <b style="font-size: 15px;">xls/xlsx</b> 文件，且不超过10M</div>
+          </el-upload>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" @click="submitImportForm">导 入</el-button>
+        <el-button @click="openImport = false">取 消</el-button>
+      </div>
+    </el-dialog>
+
   </div>
 </template>
 
 <script>
 import { listTask, saveDll, addTask } from "@/api/deploy";
+import {getToken} from "@/utils/auth";
 
 export default {
   name: "Deploy",
@@ -248,6 +275,7 @@ export default {
       title: "",
       // 是否显示弹出层
       open: false,
+      openImport: false,
       // 查询参数
       queryParams: {
         pageNum: 1,
@@ -258,7 +286,15 @@ export default {
         status: undefined
       },
       env: "",
-      // 表单参数
+      // 批量导入发布任务表单参数
+      importHeaders: {
+        Authorization: "Bearer " + getToken(),
+      },
+      importAction: process.env.VUE_APP_BASE_API + "/deploy/importTask",
+      formImport: {
+        env: ""
+      },
+      // 新增发布任务表单参数
       form: {
         jiraNo: "",
         demandName: "",
@@ -270,7 +306,7 @@ export default {
         outDlls: "",
         remark: ""
       },
-      // 表单校验
+      // 新增发布任务表单校验
       rules: {
         jiraNo: [
           { required: true, message: "JIRA编号不能为空", trigger: "blur" },
@@ -292,10 +328,11 @@ export default {
     };
   },
   created() {
-    this.getList();
     // this.loading = false;
     // console.log(this.$route.meta.title)
     this.env = this.$route.meta.title
+    this.formImport.env = this.$route.meta.title
+    this.getList();
   },
   methods: {
     /** 查询角色列表 */
@@ -329,13 +366,7 @@ export default {
     },
     // 取消按钮
     cancel() {
-      this.open = false;
-      this.reset();
-    },
-    // 取消按钮（数据权限）
-    cancelDataScope() {
-      this.openDataScope = false;
-      this.reset();
+      this.open = false
     },
     /** 搜索按钮操作 */
     handleQuery() {
@@ -345,7 +376,6 @@ export default {
     /** 重置按钮操作 */
     resetQuery() {
       this.dateRange = [];
-      // this.resetForm("queryForm");
       this.handleQuery();
     },
     /** 新增按钮操作 */
@@ -382,6 +412,40 @@ export default {
         outDlls: "",
         remark: ""
       }
+    },
+    selectFileChange(file) {
+      const isJPG = file.name.endsWith("xls") || file.name.endsWith("xlsx")
+      const isLt_10M = file.size / 1024 / 1024 < 10
+      if (!isJPG) {
+        this.$message.error('上传文件只能是 xls/xlsx 格式！')
+        this.$refs.importTaskUpload.clearFiles()
+      }
+      if (!isLt_10M) {
+        this.$message.error('上传文件大小不能超过 10MB！')
+        this.$refs.importTaskUpload.clearFiles()
+      }
+      return isJPG && isLt_10M
+    },
+    submitImportForm() {
+      let uploadFile = this.$refs.importTaskUpload.uploadFiles
+      if (!uploadFile || uploadFile.length < 1) {
+        this.$message.warning('请选择文件！')
+      }
+      this.$refs.importTaskUpload.submit()
+    },
+    uploadSuccess(resp, file) {
+      if (resp.code !== 200) {
+        this.$message.error(resp.msg)
+        this.$refs.importTaskUpload.uploadFiles[0].status = "ready"
+      } else {
+        this.$message.success('导入成功！')
+        this.openImport = false
+        this.getList()
+        this.$refs.importTaskUpload.clearFiles()
+      }
+    },
+    uploadError(err, file) {
+      this.$message.error('导入失败！')
     }
   }
 };

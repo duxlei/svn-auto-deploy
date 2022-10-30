@@ -43,4 +43,6 @@ public interface TaskRecordMapper {
      */
     int updateById(TaskRecord task);
 
+    /** 批量更新任务 */
+    int batchUpdate(@Param("tasks") List<TaskRecord> tasks, @Param("env") String env);
 }

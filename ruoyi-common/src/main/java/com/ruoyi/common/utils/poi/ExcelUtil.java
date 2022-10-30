@@ -284,7 +284,7 @@ public class ExcelUtil<T>
      */
     public List<T> importExcel(InputStream is) throws Exception
     {
-        return importExcel(is, 0);
+        return importExcel(is, 0, 1);
     }
 
     /**
@@ -294,9 +294,9 @@ public class ExcelUtil<T>
      * @param titleNum 标题占用行数
      * @return 转换后集合
      */
-    public List<T> importExcel(InputStream is, int titleNum) throws Exception
+    public List<T> importExcel(InputStream is, int titleNum, int contentNum) throws Exception
     {
-        return importExcel(StringUtils.EMPTY, is, titleNum);
+        return importExcel(StringUtils.EMPTY, is, titleNum, contentNum);
     }
 
     /**
@@ -304,10 +304,11 @@ public class ExcelUtil<T>
      * 
      * @param sheetName 表格索引名
      * @param titleNum 标题占用行数
+     * @param contentNum 内容开始行数
      * @param is 输入流
      * @return 转换后集合
      */
-    public List<T> importExcel(String sheetName, InputStream is, int titleNum) throws Exception
+    public List<T> importExcel(String sheetName, InputStream is, int titleNum, int contentNum) throws Exception
     {
         this.type = Type.IMPORT;
         this.wb = WorkbookFactory.create(is);
@@ -362,7 +363,7 @@ public class ExcelUtil<T>
                     fieldsMap.put(column, objects);
                 }
             }
-            for (int i = titleNum + 1; i <= rows; i++)
+            for (int i = contentNum; i <= rows; i++)
             {
                 // 从第2行开始取数据,默认第一行是表头.
                 Row row = sheet.getRow(i);

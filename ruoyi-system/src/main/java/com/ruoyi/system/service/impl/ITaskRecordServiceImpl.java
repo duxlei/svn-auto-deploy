@@ -15,10 +15,13 @@ import com.ruoyi.system.mapper.TaskRecordMapper;
 import com.ruoyi.system.service.ITaskRecordService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * @author duhg
@@ -57,7 +60,9 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int importTask(List<TaskRecord> taskList, String env, String createBy) {
+        taskList = taskList.stream().filter(Objects::nonNull).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(taskList)) {
             return 0;
         }
@@ -81,8 +86,29 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
             task.setOutDlls(""); // 导入默认将DLL设置为空
             task.setDemandType(1); // 设置默认类型
             task.setEnv(env); // 设置环境
-            task.setCreateBy(createBy); // 设置创建人
         }
-        return taskRecordMapper.batchInsert(taskList);
+        List<String> jiraNoList = taskList.stream().map(TaskRecord::getJiraNo).collect(Collectors.toList());
+        TaskRecordQueryVo query = new TaskRecordQueryVo();
+        query.setJiraNoList(jiraNoList);
+        query.setEnv(env);
+        List<TaskRecord> existTasks = taskRecordMapper.selectList(query);
+        List<String> existJiraNoList = existTasks.stream().map(TaskRecord::getJiraNo).collect(Collectors.toList());
+
+        // 需要插入的任务
+        List<TaskRecord> insertList = taskList.stream().filter(e -> !existJiraNoList.contains(e.getJiraNo())).collect(Collectors.toList());
+        // 需要更新的任务
+        List<TaskRecord> updateList = taskList.stream().filter(e -> existJiraNoList.contains(e.getJiraNo())).collect(Collectors.toList());
+
+        insertList.forEach(e -> e.setCreateBy(createBy)); // 为插入的任务设置创建人
+        updateList.forEach(e -> e.setUpdateBy(createBy)); // 为更新的任务设置更新人
+
+        if (!CollectionUtils.isEmpty(insertList)) {
+            taskRecordMapper.batchInsert(insertList);
+        }
+        if (!CollectionUtils.isEmpty(updateList)) {
+            taskRecordMapper.batchUpdate(updateList, env);
+        }
+
+        return taskList.size();
     }
 }

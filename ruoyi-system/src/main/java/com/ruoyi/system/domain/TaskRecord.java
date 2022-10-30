@@ -22,7 +22,6 @@ public class TaskRecord {
     private String jiraNo;
     @Excel(name = "名称")
     private String demandName;
-    @Excel(name = "类型")
     private Integer demandType;
     @Excel(name = "关联业务需求")
     private String relateDemand;
