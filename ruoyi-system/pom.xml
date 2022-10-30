@@ -23,6 +23,13 @@
             <artifactId>ruoyi-common</artifactId>
         </dependency>
 
+        <!-- svnkit -->
+        <dependency>
+            <groupId>org.tmatesoft.svnkit</groupId>
+            <artifactId>svnkit</artifactId>
+            <version>1.10.8</version>
+        </dependency>
+
     </dependencies>
 
 </project>

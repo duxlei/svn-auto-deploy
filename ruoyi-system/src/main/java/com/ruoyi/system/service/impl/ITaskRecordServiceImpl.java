@@ -7,16 +7,19 @@
  */
 package com.ruoyi.system.service.impl;
 
+import com.ruoyi.common.core.redis.RedisCache;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.TaskRecord;
 import com.ruoyi.system.domain.vo.TaskRecordQueryVo;
 import com.ruoyi.system.mapper.TaskRecordMapper;
 import com.ruoyi.system.service.ITaskRecordService;
+import com.ruoyi.system.service.deploy.DefaultDeployProcess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
+import org.tmatesoft.svn.core.SVNException;
 
 import java.util.Date;
 import java.util.List;
@@ -32,6 +35,12 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
 
     @Autowired
     private TaskRecordMapper taskRecordMapper;
+
+    @Autowired
+    private RedisCache redisCache;
+
+    @Autowired
+    private DefaultDeployProcess deployProcess;
 
     @Override
     public List<TaskRecord> selectList(TaskRecordQueryVo queryVo) {
@@ -110,5 +119,30 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
         }
 
         return taskList.size();
+    }
+
+    @Override
+    public int deploy(List<Long> taskIds, String env, String opt) {
+        if (CollectionUtils.isEmpty(taskIds)) {
+            return 0;
+        }
+        // 将所有发布任务查询出来
+        TaskRecordQueryVo query = new TaskRecordQueryVo();
+        query.setIds(taskIds);
+        List<TaskRecord> taskRecords = taskRecordMapper.selectList(query);
+        if (CollectionUtils.isEmpty(taskRecords)) {
+            return 0;
+        }
+
+        // TODO 排队逻辑
+
+        // 执行发布流程
+        try {
+            deployProcess.deploy(env, taskRecords);
+        } catch (SVNException e) {
+            e.printStackTrace();
+        }
+
+        return taskIds.size();
     }
 }

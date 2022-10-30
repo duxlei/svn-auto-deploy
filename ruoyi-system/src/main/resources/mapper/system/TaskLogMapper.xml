@@ -34,7 +34,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		)
 	</insert>
 
-	<update id="updateByJiraNo">
+	<update id="update">
 		update task_log
 		<set>
 			<if test="taskLog != null and taskLog != ''">task_log=#{taskLog},</if>

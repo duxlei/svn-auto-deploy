@@ -23,4 +23,7 @@ public interface ITaskRecordService {
 
     /** 批量导入发布任务 */
     int importTask(List<TaskRecord> taskList, String env, String createBy);
+
+    /** 执行入发布任务 */
+    int deploy(List<Long> taskIds, String env, String opt);
 }

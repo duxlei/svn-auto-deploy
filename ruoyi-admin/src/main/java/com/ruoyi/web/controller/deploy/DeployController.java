@@ -72,7 +72,7 @@ public class DeployController extends BaseController {
     /**
      * 批量导入发布任务
      */
-    @Log(title = "发布任务", businessType = BusinessType.IMPORT)
+    @Log(title = "发布任务导入", businessType = BusinessType.IMPORT)
     @PreAuthorize("@ss.hasPermi('deploy:import')")
     @PostMapping("/importTask")
     public AjaxResult importTask(MultipartFile file, String env) throws Exception {
@@ -86,6 +86,17 @@ public class DeployController extends BaseController {
         List<TaskRecord> taskList = util.importExcel(file.getInputStream(), 1, 5);
         String createBy = getUsername();
         return toAjax(taskRecordService.importTask(taskList, env, createBy));
+    }
+
+    /**
+     * 执行入发布任务
+     */
+    @Log(title = "发布任务", businessType = BusinessType.DEPLOY)
+    @PreAuthorize("@ss.hasPermi('deploy:deploy')")
+    @PostMapping("/deploy")
+    public AjaxResult deploy(@RequestParam List<Long> taskIds, @RequestParam String env) throws Exception {
+        String opt = getUsername();
+        return toAjax(taskRecordService.deploy(taskIds, env, opt));
     }
 
 }

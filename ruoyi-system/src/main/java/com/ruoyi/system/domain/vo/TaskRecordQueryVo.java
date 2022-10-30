@@ -16,6 +16,8 @@ import java.util.List;
  * @date 2022/10/28 19:23
  */
 public class TaskRecordQueryVo {
+    private Long id;
+    private List<Long> ids;
     private String jiraNo;
     private List<String> jiraNoList;
     private String demandName;
@@ -87,5 +89,21 @@ public class TaskRecordQueryVo {
 
     public void setJiraNoList(List<String> jiraNoList) {
         this.jiraNoList = jiraNoList;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public List<Long> getIds() {
+        return ids;
+    }
+
+    public void setIds(List<Long> ids) {
+        this.ids = ids;
     }
 }
