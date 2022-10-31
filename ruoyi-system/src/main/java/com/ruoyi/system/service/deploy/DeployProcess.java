@@ -8,7 +8,6 @@
 package com.ruoyi.system.service.deploy;
 
 import com.ruoyi.system.domain.TaskRecord;
-import org.tmatesoft.svn.core.SVNException;
 
 import java.util.List;
 
@@ -19,6 +18,6 @@ import java.util.List;
 public interface DeployProcess {
 
     /** 发布 */
-    void deploy(String env, List<TaskRecord> taskRecords) throws SVNException;
+    void deploy(String src, String env, List<TaskRecord> taskRecords) throws Exception;
 
 }

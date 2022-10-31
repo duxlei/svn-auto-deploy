@@ -9,6 +9,7 @@ package com.ruoyi.system.service.deploy;
 
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.TaskRecord;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tmatesoft.svn.core.*;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
@@ -16,10 +17,7 @@ import org.tmatesoft.svn.core.internal.io.fs.FSRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
-import org.tmatesoft.svn.core.wc.SVNClientManager;
-import org.tmatesoft.svn.core.wc.SVNRevision;
-import org.tmatesoft.svn.core.wc.SVNUpdateClient;
-import org.tmatesoft.svn.core.wc.SVNWCUtil;
+import org.tmatesoft.svn.core.wc.*;
 
 import java.io.File;
 import java.util.*;
@@ -39,14 +37,17 @@ public class DefaultDeployProcess implements DeployProcess {
     public static String PASS_WD = "123456";
     public static List<String> IGNORE_FILE = Arrays.asList(".svn", ".git");
 
+    @Autowired
+    private SvnRepoHolder svnRepoHolder;
+
     @Override
-    public void deploy(String env, List<TaskRecord> taskRecords) throws SVNException {
+    public void deploy(String src, String env, List<TaskRecord> taskRecords) throws Exception {
 
         // checkout并更新当前env分支的代码
         checkoutAndUpdateEnv(env);
 
         // 循环执行每个任务的合并逻辑
-        List<DeployTaskItem> deployTaskItems = mergeBranch(taskRecords, env);
+        List<DeployTaskItem> deployTaskItems = mergeBranch(src, env, taskRecords);
 
         // 执行编译脚本
         compileDlls(taskRecords);
@@ -85,7 +86,7 @@ public class DefaultDeployProcess implements DeployProcess {
         SVNClientManager clientManager = SVNClientManager.newInstance(SVNWCUtil.createDefaultOptions(false), USER_NAME, PASS_WD);
         SVNUpdateClient updateClient = clientManager.getUpdateClient();
         SVNURL SVN_URL = SVNURL.parseURIEncoded(SVN_REPO);
-        ;
+
         updateClient.doCheckout(SVN_URL, WORK_DIR, SVNRevision.HEAD, SVNRevision.HEAD, SVNDepth.INFINITY, true);
 
         // switch
@@ -96,7 +97,7 @@ public class DefaultDeployProcess implements DeployProcess {
     /**
      * 循环执行每个任务的合并逻辑
      */
-    private List<DeployTaskItem> mergeBranch(List<TaskRecord> taskRecords, String env) throws SVNException {
+    private List<DeployTaskItem> mergeBranch(String src, String env, List<TaskRecord> taskRecords) throws SVNException {
         List<DeployTaskItem> deployTaskItems = new ArrayList<>();
         // 根据任务的JIRA编号，获取所有需要合并的commit
         Map<String, List<SVNLogEntry>> mergeMap = collectCommit(taskRecords, env);
@@ -104,7 +105,7 @@ public class DefaultDeployProcess implements DeployProcess {
         for (TaskRecord taskRecord : taskRecords) {
             // 合并本任务关联的提交
             List<SVNLogEntry> logEntries = mergeMap.get(taskRecord.getJiraNo());
-            String log = mergeTaskCommit(logEntries);
+            String log = mergeTaskCommit(src, env, logEntries);
             // 修改任务状态为【已合并】
             DeployTaskItem deployTaskItem = new DeployTaskItem();
             deployTaskItem.setLog(log);
@@ -116,9 +117,24 @@ public class DefaultDeployProcess implements DeployProcess {
     }
 
     /** 合并Commit */
-    private String mergeTaskCommit(List<SVNLogEntry> logEntries) {
-        // TODO 合并Commit
-        return "";
+    private String mergeTaskCommit(String src, String env, List<SVNLogEntry> logEntries) throws SVNException {
+        // 合并Commit
+        StringBuffer sb = new StringBuffer();
+        for (SVNLogEntry logEntry : logEntries) {
+            // 解析提交日志
+            sb.append(parseLog(logEntry));
+            // 上游合并 分支为空就不合并
+            if (StringUtils.isEmpty(src)) {
+                continue;
+            }
+            // 合并
+            merge(src, env, logEntry.getRevision());
+        }
+        return sb.toString();
+    }
+
+    public void merge(String src, String env, long revision) throws SVNException {
+        svnRepoHolder.merge(src, env, revision);
     }
 
     /** 收集需要合并的Commit */
@@ -171,5 +187,23 @@ public class DefaultDeployProcess implements DeployProcess {
         }
         System.out.println("changedPaths : " + result);
         System.out.println("===================");
+    }
+
+    private String parseLog(SVNLogEntry svnlogentry) {
+        StringBuffer result = new StringBuffer("================");
+        result.append("\nrevision: " + svnlogentry.getRevision());
+        result.append("\nauthor  : " + svnlogentry.getAuthor());
+        result.append("\nmessage : " + svnlogentry.getMessage());
+        result.append("\n变更文件列表 : ");
+        Map<String, SVNLogEntryPath> changedPaths = svnlogentry.getChangedPaths();
+        if (changedPaths != null && !changedPaths.isEmpty()) {
+            for (Iterator paths = changedPaths.values().iterator(); paths.hasNext(); ) {
+                result.append('\n');
+                SVNLogEntryPath path = (SVNLogEntryPath) paths.next();
+                result.append(path.toString());
+            }
+        }
+        result.append("\n");
+        return result.toString();
     }
 }

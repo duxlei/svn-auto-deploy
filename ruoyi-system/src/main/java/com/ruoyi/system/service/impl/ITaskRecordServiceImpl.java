@@ -133,13 +133,15 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
         if (CollectionUtils.isEmpty(taskRecords)) {
             return 0;
         }
+        // TODO 获取当前分支上游的合并分支
+        String src = "sit";
 
         // TODO 排队逻辑
 
         // 执行发布流程
         try {
-            deployProcess.deploy(env, taskRecords);
-        } catch (SVNException e) {
+            deployProcess.deploy(src, env, taskRecords);
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
