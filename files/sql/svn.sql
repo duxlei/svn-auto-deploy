@@ -12,7 +12,7 @@ create table if not exists task_record (
     remark          varchar(500)    default '' comment '备注',
     iterate_week    date            not null comment '需求迭代周',
     out_dlls        varchar(5000)   not null comment '输出DLL（多个文件以应为逗号隔开）',
-    status          tinyint         not null default 0 comment '最近发布状态 0-未发布1-已合并2-已编译3-发布成功4-发布失败',
+    status          tinyint         not null default 0 comment '最近发布状态 0-未发布1-已合并2-合并失败3-已编译4-编译失败5-发布成功6-发布失败',
     env             varchar(20)     not null comment '任务所属环境',
 
     create_time     datetime        not null default current_timestamp comment '创建时间',

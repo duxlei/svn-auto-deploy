@@ -129,3 +129,7 @@ xss:
   excludes: /system/notice
   # 匹配链接
   urlPatterns: /system/*,/monitor/*,/tool/*
+
+# 业务配置
+deploy:
+  svnRepoUrl: svn://192.168.56.100

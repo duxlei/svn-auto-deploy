@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
+import org.tmatesoft.svn.core.SVNErrorCode;
 import org.tmatesoft.svn.core.SVNException;
 
 import java.util.Date;
@@ -140,9 +141,17 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
 
         // 执行发布流程
         try {
-            deployProcess.deploy(src, env, taskRecords);
+            deployProcess.deploy(opt, src, env, taskRecords);
         } catch (Exception e) {
+            if (e instanceof SVNException) {
+                SVNErrorCode errorCode = ((SVNException) e).getErrorMessage().getErrorCode();
+                if (SVNErrorCode.WC_SCHEDULE_CONFLICT.getCode() == errorCode.getCode() ||
+                    SVNErrorCode.WC_FOUND_CONFLICT.getCode() == errorCode.getCode()) {
+                    throw new RuntimeException("合并过程中出现冲突，请手动处理");
+                }
+            }
             e.printStackTrace();
+            throw new RuntimeException("发布失败");
         }
 
         return taskIds.size();

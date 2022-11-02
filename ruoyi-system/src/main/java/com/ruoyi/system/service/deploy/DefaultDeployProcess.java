@@ -7,20 +7,23 @@
  */
 package com.ruoyi.system.service.deploy;
 
+import cn.hutool.core.io.FileUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.TaskRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.tmatesoft.svn.core.*;
-import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.internal.io.fs.FSRepositoryFactory;
-import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
-import org.tmatesoft.svn.core.io.SVNRepository;
-import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
 import org.tmatesoft.svn.core.wc.*;
 
 import java.io.File;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author duhg
@@ -29,34 +32,49 @@ import java.util.*;
 @Component
 public class DefaultDeployProcess implements DeployProcess {
 
-    public static String SVN_REPO = "svn://192.168.56.100";
+    private static final Logger log = LoggerFactory.getLogger(DefaultDeployProcess.class);
+
+    @Value("${deploy.svnRepoUrl}")
+    public String SVN_REPO = "svn://192.168.56.100";
 
     public static String LOCAL_DIR = "svn_wc";
     public static File WORK_DIR = new File(LOCAL_DIR);
     public static String USER_NAME = "duhg";
     public static String PASS_WD = "123456";
+    public static String STATIC_PATH = "/static";
     public static List<String> IGNORE_FILE = Arrays.asList(".svn", ".git");
 
     @Autowired
     private SvnRepoHolder svnRepoHolder;
 
     @Override
-    public void deploy(String src, String env, List<TaskRecord> taskRecords) throws Exception {
+    public void deploy(String deployer, String src, String env, List<TaskRecord> taskRecords) throws Exception {
+        // TODO 需要有个全局的日志记录，全流程记录，组后落库
 
         // checkout并更新当前env分支的代码
         checkoutAndUpdateEnv(env);
 
         // 循环执行每个任务的合并逻辑
         List<DeployTaskItem> deployTaskItems = mergeBranch(src, env, taskRecords);
+        if (deployTaskItems.stream().anyMatch(e -> e.getTaskStatus() == 2)) {
+            // TODO 如果有合并失败需要发送邮件
+            // TODO 更新发布任务状态、插入发布日志
+            return;
+        }
 
         // 执行编译脚本
-        compileDlls(taskRecords);
+        compileDlls(taskRecords, STATIC_PATH);
+        // TODO 编译成功，更新发布任务状态已编译
+        deployTaskItems.forEach(e -> e.setTaskStatus(3));
 
         // 复制DLL和静态资源
-        copyDllAndStatic(deployTaskItems);
+        copyDllAndStatic(deployTaskItems, src, STATIC_PATH);
 
-        // 向远程仓库push代码
-        pushRepo(env);
+        // 向远程仓库commit代码
+        pushRepo(deployer);
+        // TODO commit成功，更新发布任务状态发布成功
+        deployTaskItems.forEach(e -> e.setTaskStatus(5));
+        // TODO 更新发布任务状态、插入发布日志
 
         // 清除wc
         clearWc();
@@ -68,14 +86,46 @@ public class DefaultDeployProcess implements DeployProcess {
         // TODO 清除wc
     }
 
-    /** 向远程仓库push代码 */
-    private void pushRepo(String env) {
-        // TODO 向远程仓库push代码
+    /** 向远程仓库commit代码 */
+    private void pushRepo(String deployer) throws SVNException {
+        // 添加所有无版本控制的文件（新文件）
+        SVNClientManager clientManager = SVNClientManager.newInstance(SVNWCUtil.createDefaultOptions(false), USER_NAME, PASS_WD);
+        clientManager.getStatusClient().doStatus(WORK_DIR, SVNRevision.HEAD, SVNDepth.INFINITY, false, true, false, false, status -> {
+            if (status.getNodeStatus() == SVNStatusType.STATUS_UNVERSIONED) {
+                System.out.println(status.getFile().getName() + " : " + status.getNodeStatus());
+                log.info("add file {}", status.getFile().getName());
+                clientManager.getWCClient().doAdd(status.getFile(), false, true, false, SVNDepth.INFINITY, false, true);
+            }
+        }, null);
+
+        // 向远程仓库commit代码
+        SVNCommitClient commitClient = clientManager.getCommitClient();
+        SVNCommitPacket svnCommitPacket = commitClient.doCollectCommitItems(new File[]{WORK_DIR}, false, false, SVNDepth.INFINITY, null);
+        commitClient.doCommit(svnCommitPacket, false, deployer + ": 使用SVN发版系统提交");
     }
 
     /** 复制DLL和静态资源 */
-    private void copyDllAndStatic(List<DeployTaskItem> deployTaskItems) {
-        // TODO 复制DLL和静态资源
+    private void copyDllAndStatic(List<DeployTaskItem> deployTaskItems, String srcPath, String staticPath) {
+        // 复制DLL和静态资源
+        // 复制SQL（只复制SQL文件名称和JIRA编号关联的SQL文件）
+        List<String> sqlFileList = collectSql(deployTaskItems, srcPath);
+        // 复制静态资源（只复制本次发布变化的文件）
+        List<String> staticFileList = collectStatic(deployTaskItems, srcPath);
+
+        // 全部需要复制的文件
+        List<String> allFiles = new ArrayList<>();
+        allFiles.addAll(sqlFileList);
+        allFiles.addAll(staticFileList);
+
+        // 执行文件复制逻辑（需要保持目录机构）
+        for (String file : allFiles) {
+            File copyFile = new File(WORK_DIR, srcPath + file);
+            if (!copyFile.exists()) {
+                throw new RuntimeException("发布失败，复制文件时部分文件不存在\n分支：" + srcPath + "\n文件：" + file);
+            }
+            File distFile = new File(WORK_DIR, staticPath + file);
+            FileUtil.copyFile(copyFile, distFile, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     /**
@@ -105,15 +155,39 @@ public class DefaultDeployProcess implements DeployProcess {
         for (TaskRecord taskRecord : taskRecords) {
             // 合并本任务关联的提交
             List<SVNLogEntry> logEntries = mergeMap.get(taskRecord.getJiraNo());
-            String log = mergeTaskCommit(src, env, logEntries);
-            // 修改任务状态为【已合并】
+            String log;
+            int status = 1; //默认状态为合并成功
+            try {
+                log = mergeTaskCommit(src, env, logEntries);
+            } catch (SVNException e) {
+                SVNErrorCode errorCode = e.getErrorMessage().getErrorCode();
+                if (SVNErrorCode.WC_SCHEDULE_CONFLICT.getCode() == errorCode.getCode() ||
+                    SVNErrorCode.WC_FOUND_CONFLICT.getCode() == errorCode.getCode()) {
+                    log = "合并过程中出现冲突，请处理\n" + e.getErrorMessage().getFullMessage();
+                } else {
+                    log = "发布失败\n" + getExceptStack(e);
+                }
+                status = 2; //合并失败
+            }
             DeployTaskItem deployTaskItem = new DeployTaskItem();
             deployTaskItem.setLog(log);
-            deployTaskItem.setTaskStatus(1);
+            deployTaskItem.setTaskStatus(status);
             deployTaskItem.setTaskRecord(taskRecord);
             deployTaskItems.add(deployTaskItem);
         }
         return deployTaskItems;
+    }
+
+    /** 获取异常栈信息 */
+    private String getExceptStack(Throwable t) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        try {
+            t.printStackTrace(pw);
+            return sw.toString();
+        } finally {
+            pw.close();
+        }
     }
 
     /** 合并Commit */
@@ -133,43 +207,54 @@ public class DefaultDeployProcess implements DeployProcess {
         return sb.toString();
     }
 
-    public void merge(String src, String env, long revision) throws SVNException {
-        svnRepoHolder.merge(src, env, revision);
+    public void merge(String srcPath, String envPath, long revision) throws SVNException {
+        svnRepoHolder.merge(srcPath, envPath, revision);
     }
 
     /** 收集需要合并的Commit */
-    private Map<String, List<SVNLogEntry>> collectCommit(List<TaskRecord> taskRecords, String env) throws SVNException {
-        SVNURL SVN_URL = SVNURL.parseURIEncoded(SVN_REPO); // TODO 要设置成被合并的分支
-        SVNRepositoryFactoryImpl.setup();
-        FSRepositoryFactory.setup();
-        SVNRepository repository = SVNRepositoryFactory.create(SVN_URL);
-        // 身份验证
-        ISVNAuthenticationManager authManager = SVNWCUtil.createDefaultAuthenticationManager(USER_NAME, PASS_WD.toCharArray());
-        repository.setAuthenticationManager(authManager);
-
-        // TODO 收集的时候startRevision可以优化，每次都从开头收集相对耗时
+    private Map<String, List<SVNLogEntry>> collectCommit(List<TaskRecord> taskRecords, String srcPath) throws SVNException {
         // 收集需要被合并的提交（按照JIRA号分组，后续每个JIRA号执行合并流程）
         Map<String, List<SVNLogEntry>> mergeMap = new HashMap<>();
-        repository.log(new String[]{""}, 0, -1, true, true,
-                logEntry -> {
-                    // 只收集提交message里包含本次发布所涉及的JIRA编号的提交
-                    String message = logEntry.getMessage();
-                    if (StringUtils.isEmpty(message)) {
-                        return;
-                    }
-                    TaskRecord matchTask = taskRecords.stream().filter(e -> message.contains(e.getJiraNo())).findFirst().orElse(null);
-                    if (matchTask == null) {
-                        return;
-                    }
-                    mergeMap.getOrDefault(matchTask.getJiraNo(), new ArrayList<>()).add(logEntry);
-                });
+        // TODO 收集的时候startRevision可以优化，每次都从开头收集相对耗时
+        svnRepoHolder.log(srcPath, 0, -1, logEntry -> {
+            // 只收集提交message里包含本次发布所涉及的JIRA编号的提交
+            String message = logEntry.getMessage();
+            if (StringUtils.isEmpty(message)) {
+                return;
+            }
+            TaskRecord matchTask = taskRecords.stream().filter(e -> message.contains(e.getJiraNo())).findFirst().orElse(null);
+            if (matchTask == null) {
+                return;
+            }
+            mergeMap.getOrDefault(matchTask.getJiraNo(), new ArrayList<>()).add(logEntry);
+        });
 
         return mergeMap;
     }
 
+    /** TODO 收集需要复制sql文件 */
+    private List<String> collectSql(List<DeployTaskItem> deployTaskItems, String srcPath) {
+        return new ArrayList<>();
+    }
+    /** TODO 收集需要复制静态资源文件 */
+    private List<String> collectStatic(List<DeployTaskItem> deployTaskItems, String srcPath) {
+        return new ArrayList<>();
+    }
+
     /** 执行编译脚本 */
-    private void compileDlls(List<TaskRecord> taskRecords) {
+    private void compileDlls(List<TaskRecord> taskRecords, String staticPath) {
         // TODO 执行编译脚本
+        List<String> allDlls = taskRecords.stream()
+                .map(TaskRecord::getOutDlls)
+                .filter(StringUtils::isNotEmpty)
+                .map(dlls -> Arrays.stream(dlls.split(",")).collect(Collectors.toList()))
+                .flatMap(Collection::stream)
+                .distinct()
+                .collect(Collectors.toList());
+
+        for (String dll : allDlls) {
+            FileUtil.newFile(WORK_DIR.getPath() + staticPath + dll);
+        }
     }
 
     private void printLog(SVNLogEntry svnlogentry) {

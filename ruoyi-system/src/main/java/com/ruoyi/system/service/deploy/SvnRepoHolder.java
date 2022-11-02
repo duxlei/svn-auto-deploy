@@ -7,11 +7,11 @@
  */
 package com.ruoyi.system.service.deploy;
 
+import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.system.domain.TaskRecord;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.tmatesoft.svn.core.SVNDepth;
-import org.tmatesoft.svn.core.SVNDirEntry;
-import org.tmatesoft.svn.core.SVNException;
-import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.*;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.io.fs.FSRepositoryFactory;
 import org.tmatesoft.svn.core.internal.io.svn.SVNRepositoryFactoryImpl;
@@ -21,10 +21,9 @@ import org.tmatesoft.svn.core.wc.*;
 
 import javax.annotation.PostConstruct;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.function.Consumer;
 
 /**
  * SVN仓库
@@ -34,9 +33,12 @@ import java.util.List;
 @Component
 public class SvnRepoHolder {
 
-    public static String SVN_REPO = "svn://192.168.56.100";
+    @Value("${deploy.svnRepoUrl}")
+    public String SVN_REPO = "svn://192.168.56.100";
+
     public static String USER_NAME = "duhg";
     public static String PASS_WD = "123456";
+    public static String WORK_DIR = "svn_repo";
 
     private SVNURL rootSvnUrl;
     private SVNRepository repository;
@@ -67,29 +69,39 @@ public class SvnRepoHolder {
 
     /** 切换到仓库指定目录 */
     public void sw(File wcDir, String path) throws SVNException {
-        if (!path.startsWith("/")) {
-            path = "/" + path;
-        }
-        SVNURL swUrl = SVNURL.parseURIEncoded(SVN_REPO + path);
+        SVNURL swUrl = getRemoteUrl(path);
 
         SVNUpdateClient updateClient = clientManager.getUpdateClient();
         updateClient.doSwitch(wcDir, swUrl, SVNRevision.HEAD, SVNRevision.HEAD, SVNDepth.INFINITY, true, true);
     }
 
     /** 合并 */
-    public void merge(String src, String dist, long revision) throws SVNException {
-        // TODO 合并分支
+    public void merge(String srcPath, String distPath, long revision) throws SVNException {
+        // 合并分支
         SVNDiffClient diffClient = clientManager.getDiffClient();
-        File distDir = new File(dist);
+        File distDir = new File(WORK_DIR, distPath);
 
-        Long srcLastRevision = getLastRevision(src);
-        if (srcLastRevision == null) {
+        Long distLastRevision = getLastRevision(distPath);
+        if (distLastRevision == null) {
             throw new RuntimeException("合并出错, 源目录未找到最新版本");
         }
 
-        SVNURL srcUrl = SVNURL.parseURIEncoded(SVN_REPO + src);
-        List<SVNRevisionRange> svnRevisionRanges = Collections.singletonList(new SVNRevisionRange(SVNRevision.create(revision), SVNRevision.create(revision)));
-        diffClient.doMerge(srcUrl, SVNRevision.create(srcLastRevision), svnRevisionRanges, distDir, SVNDepth.INFINITY, false, false, false, false);
+        SVNURL srcUrl = getRemoteUrl(srcPath);
+        List<SVNRevisionRange> svnRevisionRanges = Collections.singletonList(new SVNRevisionRange(SVNRevision.create(distLastRevision), SVNRevision.create(revision)));
+        diffClient.doMerge(srcUrl, SVNRevision.create(revision), svnRevisionRanges, distDir, SVNDepth.INFINITY, false, false, false, false);
+    }
+
+    /** 根据相对目录获取远程仓库地址 */
+    private SVNURL getRemoteUrl(String path) throws SVNException {
+        if (!path.startsWith("/")) {
+            path = "/" + path;
+        }
+        return SVNURL.parseURIEncoded(SVN_REPO + path);
+    }
+
+    /** 遍历日志 */
+    public void log(String path, long startRevision, long endRevision, Consumer<SVNLogEntry> consumer) throws SVNException {
+        repository.log(new String[]{path}, startRevision, endRevision, true, true, consumer::accept);
     }
 
 }
