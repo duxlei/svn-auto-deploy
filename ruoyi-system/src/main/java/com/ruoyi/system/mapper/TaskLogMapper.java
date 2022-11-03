@@ -23,6 +23,11 @@ public interface TaskLogMapper {
     int insert(TaskLog task);
 
     /**
+     * 批量新增任务日志
+     */
+    int batchInsert(@Param("tasks") List<TaskLog> tasks);
+
+    /**
      * 更新任务日志
      */
     int update(TaskLog task);

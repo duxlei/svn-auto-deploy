@@ -135,7 +135,7 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
             return 0;
         }
         // TODO 获取当前分支上游的合并分支
-        String src = "sit";
+        String src = "Sit";
 
         // TODO 排队逻辑
 

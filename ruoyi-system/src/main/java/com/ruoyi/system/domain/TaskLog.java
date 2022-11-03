@@ -26,6 +26,16 @@ public class TaskLog {
     private String updateBy;
     private Boolean deleted;
 
+    public TaskLog() {
+    }
+
+    public TaskLog(Long taskId, String taskLog, Integer status, String createBy) {
+        this.taskId = taskId;
+        this.taskLog = taskLog;
+        this.status = status;
+        this.createBy = createBy;
+    }
+
     public Long getId() {
         return id;
     }

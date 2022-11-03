@@ -34,6 +34,23 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		)
 	</insert>
 
+	<insert id="batchInsert">
+		insert into task_log (
+			task_id,
+			task_log,
+			status,
+			create_by
+		) values
+		<foreach collection="tasks" item="task" separator=",">
+		(
+			#{task.taskId},
+			#{task.taskLog},
+			#{task.status},
+			#{task.createBy}
+		)
+		</foreach>
+	</insert>
+
 	<update id="update">
 		update task_log
 		<set>
