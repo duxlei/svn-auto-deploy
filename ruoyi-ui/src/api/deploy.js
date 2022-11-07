@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import qs from 'qs'
 
 export function listTask(query) {
   let createRange = {}
@@ -26,5 +27,21 @@ export function addTask(form) {
     url: '/deploy/addTask',
     method: 'post',
     data: form
+  })
+}
+
+export function doDeploy(taskIds, env) {
+  let queryStr = qs.stringify({"taskIds": taskIds, "env": env}, {arrayFormat: 'repeat'});
+  return request({
+    url: '/deploy/deploy?' + queryStr,
+    method: 'post'
+  })
+}
+
+export function deployDetail(data) {
+  return request({
+    url: '/deploy/detail',
+    method: 'get',
+    params: {"taskId": data.id}
   })
 }

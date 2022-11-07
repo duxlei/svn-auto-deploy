@@ -16,8 +16,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		<result property="deleted"   	column="deleted" />
 	</resultMap>
 
-	<select id="selectByTaskId" resultType="com.ruoyi.system.domain.TaskLog">
-		select * from task_log where task_id=#{taskId}
+	<select id="selectByTaskId" resultMap="TaskLogResult">
+		select * from task_log where task_id=#{taskId} order by id desc
 	</select>
 
 	<insert id="insert">

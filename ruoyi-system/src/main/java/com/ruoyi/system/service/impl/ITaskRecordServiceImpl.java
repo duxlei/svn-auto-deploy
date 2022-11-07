@@ -10,8 +10,10 @@ package com.ruoyi.system.service.impl;
 import com.ruoyi.common.core.redis.RedisCache;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.system.domain.TaskLog;
 import com.ruoyi.system.domain.TaskRecord;
 import com.ruoyi.system.domain.vo.TaskRecordQueryVo;
+import com.ruoyi.system.mapper.TaskLogMapper;
 import com.ruoyi.system.mapper.TaskRecordMapper;
 import com.ruoyi.system.service.ITaskRecordService;
 import com.ruoyi.system.service.deploy.DefaultDeployProcess;
@@ -36,6 +38,9 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
 
     @Autowired
     private TaskRecordMapper taskRecordMapper;
+
+    @Autowired
+    private TaskLogMapper taskLogMapper;
 
     @Autowired
     private RedisCache redisCache;
@@ -155,5 +160,11 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
         }
 
         return taskIds.size();
+    }
+
+    @Override
+    public List<TaskLog> detail(Long taskId) {
+        List<TaskLog> taskLogs = taskLogMapper.selectByTaskId(taskId);
+        return taskLogs;
     }
 }

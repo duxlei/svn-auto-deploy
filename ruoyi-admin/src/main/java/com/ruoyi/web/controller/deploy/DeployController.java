@@ -97,4 +97,14 @@ public class DeployController extends BaseController {
         return toAjax(taskRecordService.deploy(taskIds, env, opt));
     }
 
+    /**
+     * 查看发布详情
+     */
+    @Log(title = "发布详情", businessType = BusinessType.DEPLOY)
+    @PreAuthorize("@ss.hasPermi('deploy:deploy')")
+    @GetMapping("/detail")
+    public AjaxResult detail(@RequestParam Long taskId) throws Exception {
+        return AjaxResult.success(taskRecordService.detail(taskId));
+    }
+
 }

@@ -93,13 +93,13 @@
           type="warning"
           icon="el-icon-cpu"
           size="mini"
-          @click="handleAdd"
+          @click="batchDeploy"
         >一键发布</el-button>
       </el-col>
       <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="taskList">
+    <el-table v-loading="loading" ref="taskTable" :data="taskList" @selection-change="taskSelect">
       <el-table-column type="selection" width="50" align="center" />
       <el-table-column label="JIRA编号" prop="jiraNo" width="120" />
       <el-table-column label="需求名称" prop="demandName" width="160" :show-overflow-tooltip="true" />
@@ -148,12 +148,12 @@
           <el-button
             size="mini"
             type="warning"
-            @click="handleUpdate(scope.row)"
+            @click="doDeploy(scope.row)"
             v-hasPermi="['system:role:edit']"
           >发布</el-button>
           <el-button
             size="mini"
-            @click="handleUpdate(scope.row)"
+            @click="deployDetail(scope.row)"
             v-hasPermi="['system:role:edit']"
           >查看详情</el-button>
         </template>
@@ -245,12 +245,33 @@
       </div>
     </el-dialog>
 
+    <!-- 发布任务详情 -->
+    <el-dialog
+      title="发布详情"
+      :visible.sync="openDetail"
+      :before-close="closeDeployLog"
+      width="40%">
+      <el-collapse v-model="deployLogsActive">
+        <el-collapse-item v-for="(item, idx) in deployLogs" :title="item.createTime" :name="idx">
+          <template slot="title">
+            {{ parseTime(item.createTime, '{y}-{m}-{d} {h}:{i}:{s}')}}
+            <dict-tag :options="dict.type.deploy_status" :value="item.status"/>
+          </template>
+          <pre>{{ item.taskLog }}</pre>
+        </el-collapse-item>
+      </el-collapse>
+      <span slot="footer" class="dialog-footer">
+        <el-button type="primary" @click="closeDeployLog">关 闭</el-button>
+      </span>
+    </el-dialog>
+
   </div>
 </template>
 
 <script>
-import { listTask, saveDll, addTask } from "@/api/deploy";
+import { listTask, saveDll, addTask, doDeploy, deployDetail } from "@/api/deploy";
 import {getToken} from "@/utils/auth";
+import {parseTime} from "@/utils/ruoyi";
 
 export default {
   name: "Deploy",
@@ -271,11 +292,13 @@ export default {
       total: 0,
       // 表格数据
       taskList: [],
+      selectList: [],
       // 弹出层标题
       title: "",
       // 是否显示弹出层
       open: false,
       openImport: false,
+      openDetail: false,
       // 查询参数
       queryParams: {
         pageNum: 1,
@@ -324,8 +347,10 @@ export default {
         iterateWeek: [{ required: true, message: "需求迭代周不能为空", trigger: "blur" }],
         relateDemand: [{ max: 100, message: '关联业务需求不能超过 100 个字符', trigger: 'blur' }],
         remark: [{ max: 200, message: '备注不能超过 200 个字符', trigger: 'blur' }]
-      }
-    };
+      },
+      deployLogsActive: [],
+      deployLogs: []
+    }
   },
   created() {
     // this.loading = false;
@@ -446,6 +471,57 @@ export default {
     },
     uploadError(err, file) {
       this.$message.error('导入失败！')
+    },
+    doDeploy(data) {
+      this.$confirm('确认发布?', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        doDeploy([data.id], data.env).then(resp => {
+          if (resp.code === 200) {
+            this.$message.success('发布成功！')
+          } else {
+            this.$message.error('发布失败！')
+          }
+        })
+      }).catch(() => {
+      })
+    },
+    deployDetail(data) {
+      deployDetail(data).then(resp => {
+        if (resp.code === 200) {
+          this.deployLogs = resp.data
+          this.openDetail = true
+        } else {
+          this.$message.error('查询失败！')
+        }
+      })
+    },
+    closeDeployLog() {
+      this.deployLogsActive = []
+      this.openDetail = false
+    },
+    /** 一键批量发布 */
+    batchDeploy() {
+      this.$confirm('确认发布?', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        let ids = this.selectList.map(e => e.id);
+        doDeploy(ids, this.env).then(resp => {
+          if (resp.code === 200) {
+            this.$message.success('发布成功！')
+          } else {
+            this.$message.error('发布失败！')
+          }
+        })
+      }).catch(() => {
+      })
+    },
+    taskSelect(val) {
+      this.selectList = val
     }
   }
 };

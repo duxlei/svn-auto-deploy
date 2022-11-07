@@ -1,9 +1,9 @@
-
-
 /**
  * 通用js方法封装处理
  * Copyright (c) 2019 ruoyi
  */
+
+import qs from 'qs'
 
 // 日期格式化
 export function parseTime(time, pattern) {

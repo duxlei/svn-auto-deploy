@@ -42,8 +42,7 @@ public class DefaultDeployProcess implements DeployProcess {
     @Value("${deploy.svnRepoUrl}")
     public String SVN_REPO = "svn://192.168.56.100";
 
-    public static String LOCAL_DIR = "svn_wc";
-    public static File WORK_DIR = new File(LOCAL_DIR);
+    public static File WORK_DIR = new File(SvnConstant.LOCAL_DIR);
     public static String USER_NAME = "duhg";
     public static String PASS_WD = "123456";
     public static String STATIC_PATH = "/update";
@@ -186,8 +185,8 @@ public class DefaultDeployProcess implements DeployProcess {
         updateClient.doCheckout(SVN_URL, WORK_DIR, SVNRevision.HEAD, SVNRevision.HEAD, SVNDepth.INFINITY, true);
 
         // switch
-        SVNURL SW_URL = SVNURL.parseURIEncoded("svn://192.168.56.100/" + env);
-        updateClient.doSwitch(WORK_DIR, SW_URL, SVNRevision.HEAD, SVNRevision.HEAD, SVNDepth.INFINITY, true, true);
+//        SVNURL SW_URL = SVNURL.parseURIEncoded("svn://192.168.56.100/" + env);
+//        updateClient.doSwitch(WORK_DIR, SW_URL, SVNRevision.HEAD, SVNRevision.HEAD, SVNDepth.INFINITY, true, true);
     }
 
     /**
@@ -276,7 +275,9 @@ public class DefaultDeployProcess implements DeployProcess {
             if (matchTask == null) {
                 return;
             }
-            mergeMap.getOrDefault(matchTask.getJiraNo(), new ArrayList<>()).add(logEntry);
+            List<SVNLogEntry> entries = mergeMap.getOrDefault(matchTask.getJiraNo(), new ArrayList<>());
+            entries.add(logEntry);
+            mergeMap.put(matchTask.getJiraNo(), entries);
         });
 
         return mergeMap;

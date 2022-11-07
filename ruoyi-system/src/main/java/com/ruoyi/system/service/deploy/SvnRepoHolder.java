@@ -7,8 +7,6 @@
  */
 package com.ruoyi.system.service.deploy;
 
-import com.ruoyi.common.utils.StringUtils;
-import com.ruoyi.system.domain.TaskRecord;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.tmatesoft.svn.core.*;
@@ -22,7 +20,6 @@ import org.tmatesoft.svn.core.wc.*;
 import javax.annotation.PostConstruct;
 import java.io.File;
 import java.util.*;
-import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 
 /**
@@ -38,7 +35,6 @@ public class SvnRepoHolder {
 
     public static String USER_NAME = "duhg";
     public static String PASS_WD = "123456";
-    public static String WORK_DIR = "svn_repo";
 
     private SVNURL rootSvnUrl;
     private SVNRepository repository;
@@ -79,7 +75,7 @@ public class SvnRepoHolder {
     public void merge(String srcPath, String distPath, long revision) throws SVNException {
         // 合并分支
         SVNDiffClient diffClient = clientManager.getDiffClient();
-        File distDir = new File(WORK_DIR, distPath);
+        File distDir = new File(SvnConstant.LOCAL_DIR, distPath);
 
         Long distLastRevision = getLastRevision(distPath);
         if (distLastRevision == null) {
