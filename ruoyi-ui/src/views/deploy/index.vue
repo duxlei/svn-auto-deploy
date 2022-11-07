@@ -94,6 +94,7 @@
           icon="el-icon-cpu"
           size="mini"
           @click="batchDeploy"
+          v-loading.fullscreen.lock="fullscreenLoading"
         >一键发布</el-button>
       </el-col>
       <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
@@ -150,6 +151,7 @@
             type="warning"
             @click="doDeploy(scope.row)"
             v-hasPermi="['system:role:edit']"
+            v-loading.fullscreen.lock="fullscreenLoading"
           >发布</el-button>
           <el-button
             size="mini"
@@ -280,6 +282,7 @@ export default {
     return {
       // 遮罩层
       loading: true,
+      fullscreenLoading: false,
       // 选中数组
       ids: [],
       // 非单个禁用
@@ -478,12 +481,19 @@ export default {
         cancelButtonText: '取消',
         type: 'warning'
       }).then(() => {
+        const loading = this.$loading({
+          lock: true,
+          text: '发布中...',
+          spinner: 'el-icon-loading',
+          background: 'rgba(255, 255, 255, 0.7)'
+        })
         doDeploy([data.id], data.env).then(resp => {
           if (resp.code === 200) {
             this.$message.success('发布成功！')
           } else {
             this.$message.error('发布失败！')
           }
+          loading.close()
         })
       }).catch(() => {
       })
@@ -504,18 +514,28 @@ export default {
     },
     /** 一键批量发布 */
     batchDeploy() {
+      let ids = this.selectList.map(e => e.id);
+      if (!ids || ids.length === 0) {
+        return
+      }
       this.$confirm('确认发布?', '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       }).then(() => {
-        let ids = this.selectList.map(e => e.id);
+        const loading = this.$loading({
+          lock: true,
+          text: '发布中...',
+          spinner: 'el-icon-loading',
+          background: 'rgba(255, 255, 255, 0.7)'
+        })
         doDeploy(ids, this.env).then(resp => {
           if (resp.code === 200) {
             this.$message.success('发布成功！')
           } else {
             this.$message.error('发布失败！')
           }
+          loading.close()
         })
       }).catch(() => {
       })

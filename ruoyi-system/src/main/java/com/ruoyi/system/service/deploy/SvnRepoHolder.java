@@ -81,6 +81,12 @@ public class SvnRepoHolder {
         if (distLastRevision == null) {
             throw new RuntimeException("合并出错, 源目录未找到最新版本");
         }
+        if (distLastRevision >= revision) {
+            distLastRevision = revision - 1;
+        }
+        if (distLastRevision < 0) {
+            distLastRevision = 0L;
+        }
 
         SVNURL srcUrl = getRemoteUrl(srcPath);
         List<SVNRevisionRange> svnRevisionRanges = Collections.singletonList(new SVNRevisionRange(SVNRevision.create(distLastRevision), SVNRevision.create(revision)));

@@ -8,6 +8,9 @@
 package com.ruoyi.system.service.deploy;
 
 import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.CharsetUtil;
+import com.ruoyi.common.utils.DateUtils;
+import com.ruoyi.common.utils.PathUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.TaskLog;
 import com.ruoyi.system.domain.TaskRecord;
@@ -45,7 +48,7 @@ public class DefaultDeployProcess implements DeployProcess {
     public static File WORK_DIR = new File(SvnConstant.LOCAL_DIR);
     public static String USER_NAME = "duhg";
     public static String PASS_WD = "123456";
-    public static String STATIC_PATH = "/update";
+    public static String STATIC_PATH = "update";
     public static List<String> IGNORE_FILE = Arrays.asList(".svn", ".git");
 
     // 静态资源类型（可以配置化）
@@ -79,13 +82,15 @@ public class DefaultDeployProcess implements DeployProcess {
         }
 
         // 3.执行编译脚本
-        boolean compileResult = compileDlls(taskRecords, STATIC_PATH);
+        boolean compileResult = compileDlls(taskRecords, env, STATIC_PATH);
         if (compileResult) {
             // 编译成功，更新发布任务状态已编译
             deployTaskItems.forEach(e -> e.setTaskStatus(TaskStatusEnum.COMPILED.val()));
         } else {
             // 编译失败，所有任务状态都置为编译失败状态
             deployTaskItems.forEach(e -> e.setTaskStatus(TaskStatusEnum.COMPILE_ERR.val()));
+            // 如果有合并失败需要发送邮件
+            sendNotifyEmail(deployTaskItems, env, deployer);
             // 保存发布信息
             saveDeployInfo(deployTaskItems, env, deployer);
             return;
@@ -102,6 +107,8 @@ public class DefaultDeployProcess implements DeployProcess {
         } else {
             // 推送失败，所有任务状态都置为推送失败状态
             deployTaskItems.forEach(e -> e.setTaskStatus(TaskStatusEnum.PUSH_ERR.val()));
+            // 如果有合并失败需要发送邮件
+            sendNotifyEmail(deployTaskItems, env, deployer);
         }
 
         // 6.清除wc
@@ -131,9 +138,8 @@ public class DefaultDeployProcess implements DeployProcess {
         SVNClientManager clientManager = SVNClientManager.newInstance(SVNWCUtil.createDefaultOptions(false), USER_NAME, PASS_WD);
         clientManager.getStatusClient().doStatus(WORK_DIR, SVNRevision.HEAD, SVNDepth.INFINITY, false, true, false, false, status -> {
             if (status.getNodeStatus() == SVNStatusType.STATUS_UNVERSIONED) {
-                System.out.println(status.getFile().getName() + " : " + status.getNodeStatus());
                 log.info("add file {}", status.getFile().getName());
-                clientManager.getWCClient().doAdd(status.getFile(), false, true, false, SVNDepth.INFINITY, false, true);
+                clientManager.getWCClient().doAdd(status.getFile(), false, false, false, SVNDepth.INFINITY, false, true);
             }
         }, null);
 
@@ -183,10 +189,6 @@ public class DefaultDeployProcess implements DeployProcess {
         SVNURL SVN_URL = SVNURL.parseURIEncoded(SVN_REPO);
 
         updateClient.doCheckout(SVN_URL, WORK_DIR, SVNRevision.HEAD, SVNRevision.HEAD, SVNDepth.INFINITY, true);
-
-        // switch
-//        SVNURL SW_URL = SVNURL.parseURIEncoded("svn://192.168.56.100/" + env);
-//        updateClient.doSwitch(WORK_DIR, SW_URL, SVNRevision.HEAD, SVNRevision.HEAD, SVNDepth.INFINITY, true, true);
     }
 
     /**
@@ -322,18 +324,28 @@ public class DefaultDeployProcess implements DeployProcess {
     }
 
     /** 执行编译脚本 */
-    private boolean compileDlls(List<TaskRecord> taskRecords, String staticPath) {
+    private boolean compileDlls(List<TaskRecord> taskRecords, String env, String staticPath) {
         // TODO 执行编译脚本
-        List<String> allDlls = taskRecords.stream()
-                .map(TaskRecord::getOutDlls)
-                .filter(StringUtils::isNotEmpty)
-                .map(dlls -> Arrays.stream(dlls.split(",")).collect(Collectors.toList()))
-                .flatMap(Collection::stream)
-                .distinct()
-                .collect(Collectors.toList());
+//        List<String> allDlls = taskRecords.stream()
+//                .map(TaskRecord::getOutDlls)
+//                .filter(StringUtils::isNotEmpty)
+//                .map(dlls -> Arrays.stream(dlls.split(",")).collect(Collectors.toList()))
+//                .flatMap(Collection::stream)
+//                .distinct()
+//                .collect(Collectors.toList());
 
-        for (String dll : allDlls) {
-            FileUtil.newFile(WORK_DIR.getPath() + staticPath + dll);
+        String dateName = DateUtils.dateTime() + "-" + env;
+        for (TaskRecord taskRecord : taskRecords) {
+            if (StringUtils.isEmpty(taskRecord.getOutDlls())) {
+                continue;
+            }
+            String dirName = taskRecord.getPrincipal() + "-" + taskRecord.getJiraNo() + "-" + taskRecord.getDemandName();
+            for (String dll : taskRecord.getOutDlls().split(",")) {
+                String fp = PathUtils.peekPath(staticPath, dateName, "dll", dll);
+                FileUtil.del(new File(WORK_DIR, fp));
+                File touch = FileUtil.touch(WORK_DIR, fp);
+                FileUtil.appendString(DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, new Date()), touch, CharsetUtil.UTF_8);
+            }
         }
 
         return true;
@@ -341,7 +353,7 @@ public class DefaultDeployProcess implements DeployProcess {
 
     /** TODO 发布失败发送邮件 */
     private void sendNotifyEmail(List<DeployTaskItem> deployTaskItems, String env, String deployer) {
-
+        // TODO 发送通知邮件
     }
 
     /** 保存发布信息 */
