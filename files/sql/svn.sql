@@ -41,3 +41,10 @@ create table if not exists task_log (
 
     index idx_env_jra_no(task_id)
 ) comment '发布日志表';
+
+-- 发布配置表
+create table if not exists deploy_config (
+    svn_url         varchar(500)    not null comment 'SVN服务器地址',
+    excel_skip_row  int             not null comment '导入excel跳过行数',
+    notify_emails   varchar(2000)   not null default '' comment '发布通知邮件列表'
+) comment '发布配置表';

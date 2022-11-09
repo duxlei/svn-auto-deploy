@@ -45,3 +45,18 @@ export function deployDetail(data) {
     params: {"taskId": data.id}
   })
 }
+
+export function saveConfig(data) {
+  return request({
+    url: '/deploy/config',
+    method: 'post',
+    data: data
+  })
+}
+
+export function getConfig() {
+  return request({
+    url: '/deploy/config',
+    method: 'get'
+  })
+}

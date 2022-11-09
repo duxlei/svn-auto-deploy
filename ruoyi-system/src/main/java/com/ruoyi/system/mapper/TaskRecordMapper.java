@@ -1,5 +1,6 @@
 package com.ruoyi.system.mapper;
 
+import com.ruoyi.system.domain.DeployConfig;
 import com.ruoyi.system.domain.TaskRecord;
 import com.ruoyi.system.domain.vo.TaskRecordQueryVo;
 import org.apache.ibatis.annotations.Param;
@@ -45,4 +46,10 @@ public interface TaskRecordMapper {
 
     /** 批量更新任务 */
     int batchUpdate(@Param("tasks") List<TaskRecord> tasks, @Param("env") String env);
+
+    /** 保存配置信息 */
+    int saveConfig(DeployConfig config);
+
+    /** 查询配置信息 */
+    DeployConfig selectConfig();
 }

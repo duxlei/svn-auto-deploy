@@ -42,7 +42,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	<select id="selectById" resultMap="TaskRecordResult">
 		select * from task_record where id=#{taskId}
 	</select>
-	
+
 	<insert id="insert">
 		insert into task_record (
 			jira_no,
@@ -143,5 +143,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			update_by     =	case <foreach collection="tasks" item="task">when jira_no=#{task.jiraNo} and #{task.updateBy} 		IS NOT NULL and #{task.updateBy} != ''		then #{task.updateBy}</foreach> 	else update_by end
 		where jira_no in <foreach collection="tasks" item="task" open="(" separator="," close=")">#{task.jiraNo}</foreach> and env=#{env}
 	</update>
+
+	<update id="saveConfig">
+		update deploy_config set svn_url=#{svnUrl}, excel_skip_row=#{excelSkipRow}, notify_emails=#{notifyEmails} limit 1
+	</update>
+	<select id="selectConfig" resultType="com.ruoyi.system.domain.DeployConfig">
+		select
+			svn_url svnUrl,
+			excel_skip_row excelSkipRow,
+			notify_emails notifyEmails
+		from deploy_config
+	</select>
 
 </mapper> 

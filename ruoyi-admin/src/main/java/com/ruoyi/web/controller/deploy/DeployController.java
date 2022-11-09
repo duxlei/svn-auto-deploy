@@ -15,6 +15,7 @@ import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.system.domain.DeployConfig;
 import com.ruoyi.system.domain.TaskRecord;
 import com.ruoyi.system.domain.vo.TaskRecordQueryVo;
 import com.ruoyi.system.service.ITaskRecordService;
@@ -105,6 +106,26 @@ public class DeployController extends BaseController {
     @GetMapping("/detail")
     public AjaxResult detail(@RequestParam Long taskId) throws Exception {
         return AjaxResult.success(taskRecordService.detail(taskId));
+    }
+
+    /**
+     * 保存配置信息
+     */
+    @Log(title = "发布详情", businessType = BusinessType.DEPLOY)
+    @PreAuthorize("@ss.hasPermi('deploy:config')")
+    @PostMapping("/config")
+    public AjaxResult saveConfig(@RequestBody DeployConfig config) throws Exception {
+        return AjaxResult.success(taskRecordService.saveConfig(config));
+    }
+
+    /**
+     * 保存配置信息
+     */
+    @Log(title = "发布详情", businessType = BusinessType.DEPLOY)
+    @PreAuthorize("@ss.hasPermi('deploy:config')")
+    @GetMapping("/config")
+    public AjaxResult getConfig() throws Exception {
+        return AjaxResult.success(taskRecordService.getConfig());
     }
 
 }

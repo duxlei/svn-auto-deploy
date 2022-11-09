@@ -1,5 +1,6 @@
 package com.ruoyi.system.service;
 
+import com.ruoyi.system.domain.DeployConfig;
 import com.ruoyi.system.domain.TaskLog;
 import com.ruoyi.system.domain.TaskRecord;
 import com.ruoyi.system.domain.vo.TaskRecordQueryVo;
@@ -30,4 +31,9 @@ public interface ITaskRecordService {
 
     /** 查看发布详情 */
     List<TaskLog> detail(Long taskId);
+
+    /** 保存配置 */
+    int saveConfig(DeployConfig config);
+    /** 获取配置 */
+    DeployConfig getConfig();
 }
