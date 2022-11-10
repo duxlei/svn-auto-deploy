@@ -48,3 +48,7 @@ create table if not exists deploy_config (
     excel_skip_row  int             not null comment '导入excel跳过行数',
     notify_emails   varchar(2000)   not null default '' comment '发布通知邮件列表'
 ) comment '发布配置表';
+
+-- 菜单配置支持分支地址设置
+alter table sys_menu add column env_path  varchar(100)  default '' comment '分支地址';
+alter table sys_menu add column src_path  varchar(100)  default '' comment '源分支地址';

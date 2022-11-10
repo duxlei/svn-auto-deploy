@@ -26,6 +26,7 @@ public class TaskRecordQueryVo {
     private Date startTime;
     private Date endTime;
     private String env;
+    private String createBy;
 
     public String getJiraNo() {
         return jiraNo;
@@ -105,5 +106,13 @@ public class TaskRecordQueryVo {
 
     public void setIds(List<Long> ids) {
         this.ids = ids;
+    }
+
+    public String getCreateBy() {
+        return createBy;
+    }
+
+    public void setCreateBy(String createBy) {
+        this.createBy = createBy;
     }
 }

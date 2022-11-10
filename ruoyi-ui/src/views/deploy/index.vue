@@ -75,7 +75,6 @@
           icon="el-icon-plus"
           size="mini"
           @click="handleAdd"
-          v-hasPermi="['system:role:add']"
         >新增单发布任务</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -85,7 +84,6 @@
           icon="el-icon-menu"
           size="mini"
           @click="openImport = true"
-          v-hasPermi="['system:role:add']"
         >新增批量发布任务（导入Excel）</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -530,11 +528,15 @@ export default {
           background: 'rgba(255, 255, 255, 0.7)'
         })
         doDeploy(ids, this.env).then(resp => {
+          debugger
           if (resp.code === 200) {
             this.$message.success('发布成功！')
           } else {
             this.$message.error('发布失败！')
           }
+          loading.close()
+        }).catch(err => {
+          console.log(err)
           loading.close()
         })
       }).catch(() => {

@@ -7,6 +7,7 @@
  */
 package com.ruoyi.system.service.impl;
 
+import com.ruoyi.common.core.domain.entity.SysMenu;
 import com.ruoyi.common.core.redis.RedisCache;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
@@ -14,10 +15,12 @@ import com.ruoyi.system.domain.DeployConfig;
 import com.ruoyi.system.domain.TaskLog;
 import com.ruoyi.system.domain.TaskRecord;
 import com.ruoyi.system.domain.vo.TaskRecordQueryVo;
+import com.ruoyi.system.mapper.SysMenuMapper;
 import com.ruoyi.system.mapper.TaskLogMapper;
 import com.ruoyi.system.mapper.TaskRecordMapper;
 import com.ruoyi.system.service.ITaskRecordService;
 import com.ruoyi.system.service.deploy.DefaultDeployProcess;
+import com.ruoyi.system.service.deploy.Env;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +48,9 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
 
     @Autowired
     private RedisCache redisCache;
+
+    @Autowired
+    private SysMenuMapper menuMapper;
 
     @Autowired
     private DefaultDeployProcess deployProcess;
@@ -129,7 +135,7 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
     }
 
     @Override
-    public int deploy(List<Long> taskIds, String env, String opt) {
+    public int deploy(List<Long> taskIds, String envName, String opt) {
         if (CollectionUtils.isEmpty(taskIds)) {
             return 0;
         }
@@ -141,13 +147,13 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
             return 0;
         }
         // TODO 获取当前分支上游的合并分支
-        String src = "Sit";
+        Env env = getEnv(envName);
 
         // TODO 排队逻辑
 
         // 执行发布流程
         try {
-            deployProcess.deploy(opt, src, env, taskRecords);
+            deployProcess.deploy(opt, env, taskRecords);
         } catch (Exception e) {
             if (e instanceof SVNException) {
                 SVNErrorCode errorCode = ((SVNException) e).getErrorMessage().getErrorCode();
@@ -161,6 +167,27 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
         }
 
         return taskIds.size();
+    }
+
+    /** 获取发布环境信息 */
+    private Env getEnv(String envName) {
+        SysMenu query = new SysMenu();
+        query.setMenuName(envName);
+        List<SysMenu> sysMenus = menuMapper.selectMenuList(query);
+        if (CollectionUtils.isEmpty(sysMenus)) {
+            throw new RuntimeException("环境菜单未配置");
+        }
+        if (StringUtils.isEmpty(sysMenus.get(0).getEnvPath())) {
+            throw new RuntimeException("分支信息配置错误");
+        }
+        String envPath = sysMenus.get(0).getEnvPath();
+        String srcPath = sysMenus.get(0).getSrcPath();
+        DeployConfig config = getConfig();
+        String svnUrl = config.getSvnUrl();
+        if (StringUtils.isEmpty(svnUrl)) {
+            throw new RuntimeException("SVN仓库地址未配置");
+        }
+        return new Env(envName, envPath, srcPath, svnUrl);
     }
 
     @Override

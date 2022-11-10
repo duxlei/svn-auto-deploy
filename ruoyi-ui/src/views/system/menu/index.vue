@@ -77,7 +77,7 @@
       </el-table-column>
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template slot-scope="scope">
-          <el-button 
+          <el-button
             size="mini"
             type="text"
             icon="el-icon-edit"
@@ -95,6 +95,7 @@
             size="mini"
             type="text"
             icon="el-icon-delete"
+            :disabled="scope.row.menuId === deployMenuId"
             @click="handleDelete(scope.row)"
             v-hasPermi="['system:menu:remove']"
           >删除</el-button>
@@ -103,12 +104,13 @@
     </el-table>
 
     <!-- 添加或修改菜单对话框 -->
-    <el-dialog :title="title" :visible.sync="open" width="680px" append-to-body>
-      <el-form ref="form" :model="form" :rules="rules" label-width="100px">
+    <el-dialog :title="title" :visible.sync="open" width="700px" append-to-body>
+      <el-form ref="form" :model="form" :rules="rules" label-width="110px">
         <el-row>
           <el-col :span="24">
             <el-form-item label="上级菜单" prop="parentId">
               <treeselect
+                :disabled="form.parentId === deployMenuId"
                 v-model="form.parentId"
                 :options="menuOptions"
                 :normalizer="normalizer"
@@ -117,7 +119,7 @@
               />
             </el-form-item>
           </el-col>
-          <el-col :span="24">
+          <el-col :span="24" v-show="form.parentId !== deployMenuId">
             <el-form-item label="菜单类型" prop="menuType">
               <el-radio-group v-model="form.menuType">
                 <el-radio label="M">目录</el-radio>
@@ -158,7 +160,7 @@
               <el-input-number v-model="form.orderNum" controls-position="right" :min="0" />
             </el-form-item>
           </el-col>
-          <el-col :span="12" v-if="form.menuType != 'F'">
+          <el-col :span="12" v-if="form.menuType != 'F'" v-show="form.parentId !== deployMenuId">
             <el-form-item prop="isFrame">
               <span slot="label">
                 <el-tooltip content="选择是外链则路由地址需要以`http(s)://`开头" placement="top">
@@ -166,7 +168,7 @@
                 </el-tooltip>
                 是否外链
               </span>
-              <el-radio-group v-model="form.isFrame">
+              <el-radio-group v-model="form.isFrame" :disabled="form.parentId === deployMenuId">
                 <el-radio label="0">是</el-radio>
                 <el-radio label="1">否</el-radio>
               </el-radio-group>
@@ -180,7 +182,7 @@
                 </el-tooltip>
                 路由地址
               </span>
-              <el-input v-model="form.path" placeholder="请输入路由地址" />
+              <el-input v-model="form.path" placeholder="请输入路由地址" :disabled="form.parentId === deployMenuId" />
             </el-form-item>
           </el-col>
           <el-col :span="12" v-if="form.menuType == 'C'">
@@ -191,10 +193,32 @@
                 </el-tooltip>
                 组件路径
               </span>
-              <el-input v-model="form.component" placeholder="请输入组件路径" />
+              <el-input v-model="form.component" :disabled="form.parentId === deployMenuId" placeholder="请输入组件路径" />
             </el-form-item>
           </el-col>
-          <el-col :span="12" v-if="form.menuType != 'M'">
+          <el-col :span="12" v-if="form.parentId === deployMenuId">
+            <el-form-item prop="envPath">
+              <el-input v-model="form.envPath" placeholder="trunk/projectA" maxlength="100" />
+              <span slot="label">
+                <el-tooltip content="当前分支的SVN仓库相对地址，如：trunk/projectA" placement="top">
+                <i class="el-icon-question"></i>
+                </el-tooltip>
+                分支地址
+              </span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12" v-if="form.parentId === deployMenuId">
+            <el-form-item prop="srcPath">
+              <el-input v-model="form.srcPath" placeholder="Sit/projectA" maxlength="100" />
+              <span slot="label">
+                <el-tooltip content="待合并分支的SVN仓库相对地址，如：Sit/projectA" placement="top">
+                <i class="el-icon-question"></i>
+                </el-tooltip>
+                源分支地址
+              </span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12" v-if="form.menuType != 'M' && form.parentId !== deployMenuId">
             <el-form-item prop="perms">
               <el-input v-model="form.perms" placeholder="请输入权限标识" maxlength="100" />
               <span slot="label">
@@ -205,7 +229,7 @@
               </span>
             </el-form-item>
           </el-col>
-          <el-col :span="12" v-if="form.menuType == 'C'">
+          <el-col :span="12" v-if="form.menuType == 'C' && form.parentId !== deployMenuId">
             <el-form-item prop="query">
               <el-input v-model="form.query" placeholder="请输入路由参数" maxlength="255" />
               <span slot="label">
@@ -279,6 +303,7 @@ import { listMenu, getMenu, delMenu, addMenu, updateMenu } from "@/api/system/me
 import Treeselect from "@riophae/vue-treeselect";
 import "@riophae/vue-treeselect/dist/vue-treeselect.css";
 import IconSelect from "@/components/IconSelect";
+import {deployMenuId} from "@/settings";
 
 export default {
   name: "Menu",
@@ -320,7 +345,8 @@ export default {
         path: [
           { required: true, message: "路由地址不能为空", trigger: "blur" }
         ]
-      }
+      },
+      deployMenuId: this.$store.state.settings.deployMenuId
     };
   },
   created() {
@@ -400,6 +426,10 @@ export default {
       }
       this.open = true;
       this.title = "添加菜单";
+      if (row.menuId === this.deployMenuId) {
+        this.form.menuType = 'C'
+        this.form.component = 'deploy/index'
+      }
     },
     /** 展开/折叠操作 */
     toggleExpandAll() {
@@ -421,6 +451,14 @@ export default {
     },
     /** 提交按钮 */
     submitForm: function() {
+      if (this.form.parentId === deployMenuId) {
+        if (!this.form.envPath || !this.form.envPath.trim()) {
+          this.$message.error('分支地址不能为空')
+          return
+        }
+        this.form.envPath = this.form.envPath.trim()
+        this.form.srcPath = this.form.srcPath ? this.form.srcPath.trim() : ''
+      }
       this.$refs["form"].validate(valid => {
         if (valid) {
           if (this.form.menuId != undefined) {
@@ -437,7 +475,7 @@ export default {
             });
           }
         }
-      });
+      })
     },
     /** 删除按钮操作 */
     handleDelete(row) {
@@ -447,6 +485,11 @@ export default {
         this.getList();
         this.$modal.msgSuccess("删除成功");
       }).catch(() => {});
+    }
+  },
+  watch:{
+    'form.menuName'(newVal, oldVal) {
+      this.form.path = newVal
     }
   }
 };

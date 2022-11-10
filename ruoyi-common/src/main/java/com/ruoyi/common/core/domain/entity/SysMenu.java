@@ -66,6 +66,11 @@ public class SysMenu extends BaseEntity
     /** 子菜单 */
     private List<SysMenu> children = new ArrayList<SysMenu>();
 
+    /** 分支地址 */
+    private String envPath;
+    /** 源分支地址 */
+    private String srcPath;
+
     public Long getMenuId()
     {
         return menuId;
@@ -232,7 +237,25 @@ public class SysMenu extends BaseEntity
     {
         this.children = children;
     }
-    
+
+    @Size(max = 100, message = "分支地址长度不能超过100个字符")
+    public String getEnvPath() {
+        return envPath;
+    }
+
+    public void setEnvPath(String envPath) {
+        this.envPath = envPath;
+    }
+
+    @Size(max = 100, message = "源分支地址长度不能超过100个字符")
+    public String getSrcPath() {
+        return srcPath;
+    }
+
+    public void setSrcPath(String srcPath) {
+        this.srcPath = srcPath;
+    }
+
     @Override
     public String toString() {
         return new ToStringBuilder(this,ToStringStyle.MULTI_LINE_STYLE)

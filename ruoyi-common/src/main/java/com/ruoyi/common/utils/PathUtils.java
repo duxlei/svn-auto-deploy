@@ -15,10 +15,19 @@ import java.io.File;
  */
 public class PathUtils {
 
+    /**
+     * 将地址统一转成 /abc 格式
+     * eg: abc   => /abc
+     * eg: abc/  => /abc
+     * eg: /abc/ => /abc
+     * @param paths
+     * @return
+     */
     public static String peekPath(String ... paths) {
         StringBuilder peek = new StringBuilder();
         for (String path : paths) {
-            if (!path.startsWith("/")) {
+            path = path.replaceAll("/", File.separator);
+            if (!path.startsWith(File.separator)) {
                 path = File.separator + path;
             }
             peek.append(path);

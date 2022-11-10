@@ -18,6 +18,6 @@ import java.util.List;
 public interface DeployProcess {
 
     /** 发布 */
-    void deploy(String deployer, String src, String env, List<TaskRecord> taskRecords) throws Exception;
+    void deploy(String deployer, Env env, List<TaskRecord> taskRecords) throws Exception;
 
 }

@@ -36,6 +36,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			<if test="startTime != null">and create_time &gt;= #{startTime}</if>
 			<if test="endTime != null">and create_time &lt;= #{endTime}</if>
 			<if test="env != null">and env = #{env}</if>
+			<if test="createBy != null">and (create_by = #{createBy} or principal = #{createBy})</if>
 		</where>
 	</select>
 

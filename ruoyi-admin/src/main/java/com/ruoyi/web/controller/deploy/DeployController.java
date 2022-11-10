@@ -10,6 +10,7 @@ package com.ruoyi.web.controller.deploy;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.core.domain.entity.SysRole;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.exception.ServiceException;
@@ -18,9 +19,9 @@ import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.system.domain.DeployConfig;
 import com.ruoyi.system.domain.TaskRecord;
 import com.ruoyi.system.domain.vo.TaskRecordQueryVo;
+import com.ruoyi.system.service.ISysRoleService;
 import com.ruoyi.system.service.ITaskRecordService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -37,13 +38,19 @@ public class DeployController extends BaseController {
     @Autowired
     private ITaskRecordService taskRecordService;
 
+    @Autowired
+    private ISysRoleService roleService;
+
     /**
      * 获取发布任务列表
      */
-    @PreAuthorize("@ss.hasPermi('deploy:list')")
     @GetMapping("/list")
     public TableDataInfo list(TaskRecordQueryVo queryVo) {
         startPage();
+        List<SysRole> sysRoles = roleService.selectRolesByUserId(getUserId());
+        if (sysRoles == null || sysRoles.stream().noneMatch(e -> "admin".equals(e.getRoleKey()))) {
+            queryVo.setCreateBy(getUsername());
+        }
         List<TaskRecord> list = taskRecordService.selectList(queryVo);
         return getDataTable(list);
     }
@@ -51,7 +58,6 @@ public class DeployController extends BaseController {
     /**
      * 保存更新dlls
      */
-    @PreAuthorize("@ss.hasPermi('deploy:update')")
     @GetMapping("/saveDll")
     public AjaxResult saveDll(@RequestParam Long id, @RequestParam String outDlls) {
         return toAjax(taskRecordService.saveDll(id, outDlls));
@@ -60,7 +66,6 @@ public class DeployController extends BaseController {
     /**
      * 添加发布任务
      */
-    @PreAuthorize("@ss.hasPermi('deploy:add')")
     @PostMapping("/addTask")
     public AjaxResult addTask(@RequestBody TaskRecord taskRecord) {
         // 设置创建人
@@ -72,7 +77,6 @@ public class DeployController extends BaseController {
      * 批量导入发布任务
      */
     @Log(title = "发布任务导入", businessType = BusinessType.IMPORT)
-    @PreAuthorize("@ss.hasPermi('deploy:import')")
     @PostMapping("/importTask")
     public AjaxResult importTask(MultipartFile file, String env) throws Exception {
         if (StringUtils.isEmpty(env)) {
@@ -91,7 +95,6 @@ public class DeployController extends BaseController {
      * 执行入发布任务
      */
     @Log(title = "发布任务", businessType = BusinessType.DEPLOY)
-    @PreAuthorize("@ss.hasPermi('deploy:deploy')")
     @PostMapping("/deploy")
     public AjaxResult deploy(@RequestParam List<Long> taskIds, @RequestParam String env) throws Exception {
         String opt = getUsername();
@@ -101,8 +104,6 @@ public class DeployController extends BaseController {
     /**
      * 查看发布详情
      */
-    @Log(title = "发布详情", businessType = BusinessType.DEPLOY)
-    @PreAuthorize("@ss.hasPermi('deploy:deploy')")
     @GetMapping("/detail")
     public AjaxResult detail(@RequestParam Long taskId) throws Exception {
         return AjaxResult.success(taskRecordService.detail(taskId));
@@ -111,8 +112,7 @@ public class DeployController extends BaseController {
     /**
      * 保存配置信息
      */
-    @Log(title = "发布详情", businessType = BusinessType.DEPLOY)
-    @PreAuthorize("@ss.hasPermi('deploy:config')")
+    @Log(title = "保存配置信息", businessType = BusinessType.DEPLOY_CONFIG)
     @PostMapping("/config")
     public AjaxResult saveConfig(@RequestBody DeployConfig config) throws Exception {
         return AjaxResult.success(taskRecordService.saveConfig(config));
@@ -121,8 +121,6 @@ public class DeployController extends BaseController {
     /**
      * 保存配置信息
      */
-    @Log(title = "发布详情", businessType = BusinessType.DEPLOY)
-    @PreAuthorize("@ss.hasPermi('deploy:config')")
     @GetMapping("/config")
     public AjaxResult getConfig() throws Exception {
         return AjaxResult.success(taskRecordService.getConfig());

@@ -68,12 +68,11 @@ export default {
     }
   },
   created() {
-    console.log('1232131')
     getConfig().then(resp => {
       if (resp.code === 200) {
-        this.form.svnUrl = resp.data.svnUrl
+        this.form.svnUrl = resp.data.svnUrl.replaceAll("svn://", "")
         this.form.excelSkipRow = resp.data.excelSkipRow
-        this.emailList = resp.data.notifyEmails.split(',')
+        this.emailList = resp.data.notifyEmails ? resp.data.notifyEmails.split(',') : []
       }
     })
   },
@@ -82,7 +81,8 @@ export default {
       this.$refs["form"].validate(valid => {
         if (valid) {
           let param = {
-            ...this.form,
+            svnUrl: 'svn://' + this.form.svnUrl,
+            excelSkipRow: this.form.excelSkipRow,
             notifyEmails: this.emailList.join(',')
           }
           saveConfig(param).then(resp => {
