@@ -46,7 +46,8 @@ create table if not exists task_log (
 create table if not exists deploy_config (
     svn_url         varchar(500)    not null comment 'SVN服务器地址',
     excel_skip_row  int             not null comment '导入excel跳过行数',
-    notify_emails   varchar(2000)   not null default '' comment '发布通知邮件列表'
+    notify_emails   varchar(2000)   not null default '' comment '发布通知邮件列表',
+    mail_config text not null comment '邮件服务器配置'
 ) comment '发布配置表';
 
 -- 菜单配置支持分支地址设置

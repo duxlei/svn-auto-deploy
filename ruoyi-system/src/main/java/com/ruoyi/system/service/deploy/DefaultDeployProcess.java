@@ -9,9 +9,13 @@ package com.ruoyi.system.service.deploy;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.CharsetUtil;
+import cn.hutool.extra.mail.MailAccount;
+import cn.hutool.extra.mail.MailUtil;
+import com.alibaba.fastjson2.JSON;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.PathUtils;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.system.domain.DeployConfig;
 import com.ruoyi.system.domain.TaskLog;
 import com.ruoyi.system.domain.TaskRecord;
 import com.ruoyi.system.mapper.TaskLogMapper;
@@ -75,7 +79,7 @@ public class DefaultDeployProcess implements DeployProcess {
         List<DeployTaskItem> deployTaskItems = mergeBranch(env, taskRecords);
         if (deployTaskItems.stream().anyMatch(e -> Objects.equals(e.getTaskStatus(), TaskStatusEnum.MERGE_ERR.val()))) {
             // 如果有合并失败需要发送邮件
-            sendNotifyEmail(deployTaskItems, env, deployer);
+            sendNotifyEmail(deployTaskItems, env, "合并失败");
             // 保存发布信息
             saveDeployInfo(deployTaskItems, env, deployer);
             return;
@@ -90,7 +94,7 @@ public class DefaultDeployProcess implements DeployProcess {
             // 编译失败，所有任务状态都置为编译失败状态
             deployTaskItems.forEach(e -> e.setTaskStatus(TaskStatusEnum.COMPILE_ERR.val()));
             // 如果有合并失败需要发送邮件
-            sendNotifyEmail(deployTaskItems, env, deployer);
+            sendNotifyEmail(deployTaskItems, env, "编译失败");
             // 保存发布信息
             saveDeployInfo(deployTaskItems, env, deployer);
             return;
@@ -108,7 +112,7 @@ public class DefaultDeployProcess implements DeployProcess {
             // 推送失败，所有任务状态都置为推送失败状态
             deployTaskItems.forEach(e -> e.setTaskStatus(TaskStatusEnum.PUSH_ERR.val()));
             // 如果有合并失败需要发送邮件
-            sendNotifyEmail(deployTaskItems, env, deployer);
+            sendNotifyEmail(deployTaskItems, env, "Commit失败");
         }
 
         // 6.清除wc
@@ -145,31 +149,53 @@ public class DefaultDeployProcess implements DeployProcess {
 
         // 向远程仓库commit代码
         SVNCommitClient commitClient = clientManager.getCommitClient();
-        SVNCommitPacket svnCommitPacket = commitClient.doCollectCommitItems(new File[]{WORK_DIR}, false, false, SVNDepth.INFINITY, null);
+        SVNCommitPacket svnCommitPacket = commitClient.doCollectCommitItems(new File[]{WORK_DIR}, false, true, SVNDepth.INFINITY, null);
         commitClient.doCommit(svnCommitPacket, false, deployer + ": 使用SVN发版系统提交");
         return true;
     }
 
     /** 复制DLL和静态资源 */
-    private void copyDllAndStatic(List<DeployTaskItem> deployTaskItems, Env env, String staticPath) {
+    private void copyDllAndStatic(List<DeployTaskItem> deployTaskItems, Env env, String staticPath) throws SVNException {
+//        SVNClientManager clientManager = SVNClientManager.newInstance(SVNWCUtil.createDefaultOptions(false), USER_NAME, PASS_WD);
         // 复制DLL和静态资源
-        // 复制SQL（只复制SQL文件名称和JIRA编号关联的SQL文件）
-        List<String> sqlFileList = collectSql(deployTaskItems, env.getPath());
-        // 复制静态资源（只复制本次发布变化的文件）
-        List<String> staticFileList = collectStatic(deployTaskItems, env.getSrcPath());
+        String dateName = DateUtils.dateTime() + "-" + env.getName();
+        List<String> staticFileList = new ArrayList<>();
+        for (DeployTaskItem deployTaskItem : deployTaskItems) {
+            TaskRecord taskRecord = deployTaskItem.getTaskRecord();
+            // 复制SQL（只复制SQL文件名称和JIRA编号关联的SQL文件）
+            List<String> sqlFileList = collectSql(taskRecord.getJiraNo(), env.getSrcPath());
+            // 复制静态资源（只复制本次发布变化的文件）
+            List<String> statics = collectStatic(deployTaskItem, env.getSrcPath());
+            staticFileList.addAll(statics);
 
-        // 全部需要复制的文件
-        List<String> allFiles = new ArrayList<>();
-        allFiles.addAll(sqlFileList);
-        allFiles.addAll(staticFileList);
+//            OptionalLong opt = deployTaskItem.getLogEntries().stream().mapToLong(SVNLogEntry::getRevision).max();
+//            SVNRevision copyRevision = opt.isPresent() ? SVNRevision.create(opt.getAsLong()) : SVNRevision.HEAD;
+//            List<SVNCopySource> scs = new ArrayList<>();
 
-        // 执行文件复制逻辑（需要保持目录机构）
-        for (String file : allFiles) {
-            File copyFile = new File(WORK_DIR, PathUtils.peekPath(env.getSrcPath(), file));
-            if (!copyFile.exists()) {
-                throw new RuntimeException("发布失败，复制文件时部分文件不存在\n分支：" + env.getSrcPath() + "\n文件：" + file);
+            String dirName = taskRecord.getPrincipal() + "-" + taskRecord.getJiraNo() + "-" + taskRecord.getDemandName();
+            // 执行文件复制逻辑（需要保持目录结构）
+            for (String file : sqlFileList) {
+                File copyFile = new File(file);
+                if (!copyFile.exists()) {
+                    throw new RuntimeException("发布失败，复制文件时部分文件不存在\n分支：" + env.getSrcPath() + "\n文件：" + copyFile.getAbsolutePath());
+                }
+                File distFile = new File(WORK_DIR, PathUtils.peekPath(staticPath, dateName, dirName, "sql", copyFile.getName()));
+                FileUtil.copyFile(copyFile, distFile, StandardCopyOption.REPLACE_EXISTING);
+//                SVNCopySource svnCopySource = new SVNCopySource(copyRevision, copyRevision, copyFile);
+//                scs.add(svnCopySource);
+//                clientManager.getWCClient().doDelete(distFile, true, false);
             }
-            File distFile = new File(WORK_DIR, PathUtils.peekPath(staticPath, file));
+//            File distFile = new File(WORK_DIR, PathUtils.peekPath(staticPath, dateName, dirName, "sql"));
+//            SVNCopySource[] sources = scs.toArray(new SVNCopySource[0]);
+//            clientManager.getCopyClient().doCopy(sources, distFile, false, true, false);
+        }
+
+        for (String file : staticFileList) {
+            File copyFile = new File(WORK_DIR, PathUtils.peekPath(file));
+            if (!copyFile.exists()) {
+                throw new RuntimeException("发布失败，复制文件时部分文件不存在\n分支：" + env.getSrcPath() + "\n文件：" + copyFile.getAbsolutePath());
+            }
+            File distFile = new File(WORK_DIR, PathUtils.peekPath(staticPath, dateName, "other", copyFile.getName()));
             FileUtil.copyFile(copyFile, distFile, StandardCopyOption.REPLACE_EXISTING);
         }
     }
@@ -200,6 +226,7 @@ public class DefaultDeployProcess implements DeployProcess {
         Map<String, List<SVNLogEntry>> mergeMap = collectCommit(taskRecords, env);
         // 每个发布任务执行合并流程，当出现冲突时停止整个流程
         for (TaskRecord taskRecord : taskRecords) {
+            DeployTaskItem deployTaskItem = new DeployTaskItem();
             String log;
             int status = TaskStatusEnum.MERGED.val(); //默认状态为合并成功
             // 上游合并分支为空就不合并（适用于sit分支）
@@ -209,6 +236,7 @@ public class DefaultDeployProcess implements DeployProcess {
                 try {
                     // 合并本任务关联的提交
                     List<SVNLogEntry> logEntries = mergeMap.get(taskRecord.getJiraNo());
+                    deployTaskItem.setLogEntries(logEntries);
                     if (CollectionUtils.isEmpty(logEntries)) {
                         log = "没有匹配的提交记录";
                     } else {
@@ -225,7 +253,6 @@ public class DefaultDeployProcess implements DeployProcess {
                     status = TaskStatusEnum.MERGE_ERR.val(); //合并失败
                 }
             }
-            DeployTaskItem deployTaskItem = new DeployTaskItem();
             deployTaskItem.setLog(log);
             deployTaskItem.setTaskStatus(status);
             deployTaskItem.setTaskRecord(taskRecord);
@@ -256,6 +283,25 @@ public class DefaultDeployProcess implements DeployProcess {
             // 合并
             svnRepoHolder.merge(env.getRepoUrl(), env.getSrcPath(), env.getPath(), logEntry.getRevision());
         }
+        // 检查是否有冲突文件
+        List<String> conflictList = new ArrayList<>();
+        File distFile = new File(WORK_DIR, PathUtils.peekPath(env.getPath()));
+        SVNClientManager clientManager = SVNClientManager.newInstance(SVNWCUtil.createDefaultOptions(false), USER_NAME, PASS_WD);
+        clientManager.getStatusClient().doStatus(distFile, SVNRevision.HEAD, SVNDepth.INFINITY, false, true, false, false, status -> {
+            if (status == null) {
+                return;
+            }
+            SVNTreeConflictDescription treeConflict = status.getTreeConflict();
+            if (treeConflict !=  null && treeConflict.isTreeConflict()) {
+                String fn = status.getFile().getAbsolutePath().substring(WORK_DIR.getAbsolutePath().length() + 1).replace(File.separator, "/");
+                conflictList.add(fn);
+            }
+        }, null);
+        if (!CollectionUtils.isEmpty(conflictList)) {
+            String errorMsg = "合并冲突\n" + String.join("\n", conflictList);
+            throw new SVNException(SVNErrorMessage.create(SVNErrorCode.WC_SCHEDULE_CONFLICT, errorMsg));
+        }
+
         return sb.toString();
     }
 
@@ -291,8 +337,18 @@ public class DefaultDeployProcess implements DeployProcess {
         File distDir = new File(WORK_DIR, distPath);
         List<String> result = new ArrayList<>();
         FileUtil.walkFiles(distDir, file -> {
-            if (jiraNos.stream().anyMatch(e -> file.getName().contains(e)) && file.getName().equals(".sql")) {
+            if (jiraNos.stream().anyMatch(e -> file.getName().contains(e)) && file.getName().endsWith(".sql")) {
                 result.add(file.getAbsolutePath().substring(WORK_DIR.getAbsolutePath().length()));
+            }
+        });
+        return result;
+    }
+    private List<String> collectSql(String jiraNo, String path) {
+        File distDir = new File(WORK_DIR, path);
+        List<String> result = new ArrayList<>();
+        FileUtil.walkFiles(distDir, file -> {
+            if (file.getName().contains(jiraNo) && file.getName().endsWith(".sql")) {
+                result.add(file.getAbsolutePath());
             }
         });
         return result;
@@ -301,22 +357,27 @@ public class DefaultDeployProcess implements DeployProcess {
     private List<String> collectStatic(List<DeployTaskItem> deployTaskItems, String srcPath) {
         List<String> result = new ArrayList<>();
         for (DeployTaskItem deployTaskItem : deployTaskItems) {
-            if (CollectionUtils.isEmpty(deployTaskItem.getLogEntries())) {
+            result.addAll(collectStatic(deployTaskItem, srcPath));
+        }
+        return result;
+    }
+    private List<String> collectStatic(DeployTaskItem deployTaskItem, String srcPath) {
+        List<String> result = new ArrayList<>();
+        if (CollectionUtils.isEmpty(deployTaskItem.getLogEntries())) {
+            return result;
+        }
+        for (SVNLogEntry logEntry : deployTaskItem.getLogEntries()) {
+            Map<String, SVNLogEntryPath> changedPaths = logEntry.getChangedPaths();
+            if (changedPaths == null || changedPaths.isEmpty()) {
                 continue;
             }
-            for (SVNLogEntry logEntry : deployTaskItem.getLogEntries()) {
-                Map<String, SVNLogEntryPath> changedPaths = logEntry.getChangedPaths();
-                if (changedPaths == null || changedPaths.isEmpty()) {
-                    continue;
-                }
-                for (SVNLogEntryPath entryPath : changedPaths.values()) {
-                    SVNNodeKind nodeKind = entryPath.getKind();
-                    String filePath = entryPath.getPath();
-                    if (nodeKind != null &&
-                        nodeKind.getID() == SVNNodeKind.FILE.getID() &&
-                        STATIC_FILE_EXT.stream().anyMatch(filePath::endsWith)) {
-                        result.add(filePath);
-                    }
+            for (SVNLogEntryPath entryPath : changedPaths.values()) {
+                SVNNodeKind nodeKind = entryPath.getKind();
+                String filePath = entryPath.getPath();
+                if (nodeKind != null &&
+                    nodeKind.getID() == SVNNodeKind.FILE.getID() &&
+                    STATIC_FILE_EXT.stream().anyMatch(filePath::endsWith)) {
+                    result.add(filePath);
                 }
             }
         }
@@ -352,8 +413,49 @@ public class DefaultDeployProcess implements DeployProcess {
     }
 
     /** TODO 发布失败发送邮件 */
-    private void sendNotifyEmail(List<DeployTaskItem> deployTaskItems, Env env, String deployer) {
+    private void sendNotifyEmail(List<DeployTaskItem> deployTaskItems, Env env, String msg) {
         // TODO 发送通知邮件
+        DeployConfig deployConfig = taskRecordMapper.selectConfig();
+        if (deployConfig == null) {
+            log.error("未配置发布信息");
+            return;
+        }
+        if (StringUtils.isEmpty(deployConfig.getNotifyEmails())) {
+            log.info("未配置通知邮箱");
+            return;
+        }
+        List<String> emails = Arrays.stream(deployConfig.getNotifyEmails().split(",")).collect(Collectors.toList());
+        try {
+            DeployConfig.MailConfig mailConfig = JSON.parseObject(deployConfig.getMailConfig(), DeployConfig.MailConfig.class);
+            String title = String.format("SVN自动发版通知(分支%s) - %s", env.getName(), msg);
+            StringBuilder content = new StringBuilder("<pre>");
+            deployTaskItems.forEach(e -> {
+                // 合并Commit
+//                StringBuffer sb = new StringBuffer();
+//                for (SVNLogEntry logEntry : e.getLogEntries()) {
+//                    // 解析提交日志
+//                    sb.append(parseLog(logEntry));
+//                }
+                content.append(String.format("JIRA：%s\n需求名：%s\n", e.getTaskRecord().getJiraNo(), e.getTaskRecord().getDemandName()));
+                content.append("vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n");
+                content.append(e.getLog());
+                content.append("\n");
+            });
+            content.append("</pre>");
+            sendMail(mailConfig, emails, title, content.toString());
+        } catch (Exception e) {
+            log.warn("发送通知邮件失败", e);
+        }
+    }
+
+    private void sendMail(DeployConfig.MailConfig mailConfig, List<String> emails, String title, String content) {
+        MailAccount account = new MailAccount();
+        account.setHost(mailConfig.getHost());
+        account.setPort(mailConfig.getPort());
+        account.setAuth(true);
+        account.setFrom(mailConfig.getFrom());
+        account.setPass(mailConfig.getPass());
+        MailUtil.send(account, emails, title, content, true);
     }
 
     /** 保存发布信息 */

@@ -19,6 +19,10 @@ public class DeployConfig {
 
     private String notifyEmails;
 
+    private String mailConfig;
+
+    private MailConfig mail;
+
     public String getSvnUrl() {
         return svnUrl;
     }
@@ -41,5 +45,60 @@ public class DeployConfig {
 
     public void setNotifyEmails(String notifyEmails) {
         this.notifyEmails = notifyEmails;
+    }
+
+    public String getMailConfig() {
+        return mailConfig;
+    }
+
+    public void setMailConfig(String mailConfig) {
+        this.mailConfig = mailConfig;
+    }
+
+    public MailConfig getMail() {
+        return mail;
+    }
+
+    public void setMail(MailConfig mail) {
+        this.mail = mail;
+    }
+
+    public static class MailConfig {
+        private String host;
+        private Integer port;
+        private String from;
+        private String pass;
+
+        public String getHost() {
+            return host;
+        }
+
+        public void setHost(String host) {
+            this.host = host;
+        }
+
+        public Integer getPort() {
+            return port;
+        }
+
+        public void setPort(Integer port) {
+            this.port = port;
+        }
+
+        public String getFrom() {
+            return from;
+        }
+
+        public void setFrom(String from) {
+            this.from = from;
+        }
+
+        public String getPass() {
+            return pass;
+        }
+
+        public void setPass(String pass) {
+            this.pass = pass;
+        }
     }
 }

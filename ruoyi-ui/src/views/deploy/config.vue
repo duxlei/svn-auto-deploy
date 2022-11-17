@@ -1,12 +1,15 @@
 <template>
   <div class="deploy-config">
     <el-form ref="form" :model="form" :rules="rules" label-width="160px">
+
+      <el-divider content-position="center">基础配置</el-divider>
+      <br/>
+
       <el-form-item label="SVN仓库地址" prop="svnUrl">
         <el-input v-model="form.svnUrl" placeholder="192.168.56.100">
           <template slot="prepend">svn://</template>
         </el-input>
       </el-form-item>
-
       <el-form-item label="通知邮件列表">
         <el-tag
           :key="tag"
@@ -33,6 +36,22 @@
         <el-input-number v-model="form.excelSkipRow" :min="0" :max="100"></el-input-number>
       </el-form-item>
 
+      <br/>
+      <el-divider content-position="center">邮件发送配置</el-divider>
+      <br/>
+      <el-form-item label="邮件服务器" prop="mail.host">
+        <el-input v-model="form.mail.host" placeholder="smtp.163.com" />
+      </el-form-item>
+      <el-form-item label="端口" prop="mail.port">
+        <el-input v-model="form.mail.port" placeholder="25" />
+      </el-form-item>
+      <el-form-item label="发送人" prop="mail.port">
+        <el-input v-model="form.mail.from" placeholder="svndeploy@camp.com" />
+      </el-form-item>
+      <el-form-item label="授权密码" prop="mail.pass">
+        <el-input v-model="form.mail.pass" type="password" />
+      </el-form-item>
+
       <el-form-item>
         <el-button type="primary" @click="onSubmit">保存配置</el-button>
         <el-button>取消</el-button>
@@ -50,7 +69,13 @@ export default {
     return {
       form: {
         excelSkipRow: 3,
-        svnUrl: ''
+        svnUrl: '',
+        mail: {
+          host: '',
+          port: '',
+          from: '',
+          pass: ''
+        }
       },
       rules: {
         svnUrl: [
@@ -72,17 +97,23 @@ export default {
       if (resp.code === 200) {
         this.form.svnUrl = resp.data.svnUrl.replaceAll("svn://", "")
         this.form.excelSkipRow = resp.data.excelSkipRow
+        this.form.mail = resp.data.mail
         this.emailList = resp.data.notifyEmails ? resp.data.notifyEmails.split(',') : []
       }
     })
   },
   methods: {
     onSubmit() {
+      // if (!this.form.mail || !this.form.mail.host || !this.form.mail.port || !this.form.mail.from || !this.form.mail.pass) {
+      //   this.$message.error('请补全邮件发送配置！')
+      //   return
+      // }
       this.$refs["form"].validate(valid => {
         if (valid) {
           let param = {
             svnUrl: 'svn://' + this.form.svnUrl,
             excelSkipRow: this.form.excelSkipRow,
+            mail: this.form.mail,
             notifyEmails: this.emailList.join(',')
           }
           saveConfig(param).then(resp => {
@@ -133,7 +164,7 @@ export default {
 <style scoped>
   .deploy-config {
     width: 50%;
-    padding: 50px 30px;
+    padding: 30px;
   }
 
   .el-tag + .el-tag {

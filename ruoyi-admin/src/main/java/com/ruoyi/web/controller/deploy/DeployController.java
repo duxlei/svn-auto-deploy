@@ -46,11 +46,11 @@ public class DeployController extends BaseController {
      */
     @GetMapping("/list")
     public TableDataInfo list(TaskRecordQueryVo queryVo) {
-        startPage();
         List<SysRole> sysRoles = roleService.selectRolesByUserId(getUserId());
         if (sysRoles == null || sysRoles.stream().noneMatch(e -> "admin".equals(e.getRoleKey()))) {
             queryVo.setCreateBy(getUsername());
         }
+        startPage();
         List<TaskRecord> list = taskRecordService.selectList(queryVo);
         return getDataTable(list);
     }

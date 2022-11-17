@@ -8,6 +8,7 @@
 package com.ruoyi.common.utils;
 
 import java.io.File;
+import java.util.regex.Matcher;
 
 /**
  * @author duhg
@@ -26,7 +27,7 @@ public class PathUtils {
     public static String peekPath(String ... paths) {
         StringBuilder peek = new StringBuilder();
         for (String path : paths) {
-            path = path.replaceAll("/", File.separator);
+            path = path.replaceAll("/", Matcher.quoteReplacement(File.separator));
             if (!path.startsWith(File.separator)) {
                 path = File.separator + path;
             }

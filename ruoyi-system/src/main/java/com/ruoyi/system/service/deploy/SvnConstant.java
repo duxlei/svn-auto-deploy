@@ -13,6 +13,6 @@ package com.ruoyi.system.service.deploy;
  */
 public class SvnConstant {
 
-    public static final String LOCAL_DIR = "~/svn_wc";
+    public static final String LOCAL_DIR = "svn_wc";
 
 }

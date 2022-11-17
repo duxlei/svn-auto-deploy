@@ -487,14 +487,15 @@ export default {
         })
         doDeploy([data.id], data.env).then(resp => {
           if (resp.code === 200) {
-            this.$message.success('发布成功！')
+            this.$message.info('发布任务已提交，请稍后刷新页面查看结果')
           } else {
             this.$message.error('发布失败！')
           }
           loading.close()
+        }).catch(err => {
+          loading.close()
         })
-      }).catch(() => {
-      })
+      }).catch(() => {})
     },
     deployDetail(data) {
       deployDetail(data).then(resp => {
@@ -530,17 +531,15 @@ export default {
         doDeploy(ids, this.env).then(resp => {
           debugger
           if (resp.code === 200) {
-            this.$message.success('发布成功！')
+            this.$message.success('发布任务已提交，请稍后刷新页面查看结果')
           } else {
             this.$message.error('发布失败！')
           }
           loading.close()
         }).catch(err => {
-          console.log(err)
           loading.close()
         })
-      }).catch(() => {
-      })
+      }).catch(() => {})
     },
     taskSelect(val) {
       this.selectList = val

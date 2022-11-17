@@ -38,6 +38,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			<if test="env != null">and env = #{env}</if>
 			<if test="createBy != null">and (create_by = #{createBy} or principal = #{createBy})</if>
 		</where>
+		order by create_time desc
 	</select>
 
 	<select id="selectById" resultMap="TaskRecordResult">
@@ -146,13 +147,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	</update>
 
 	<update id="saveConfig">
-		update deploy_config set svn_url=#{svnUrl}, excel_skip_row=#{excelSkipRow}, notify_emails=#{notifyEmails} limit 1
+		update deploy_config set
+		                         svn_url=#{svnUrl},
+		                         excel_skip_row=#{excelSkipRow},
+		                         notify_emails=#{notifyEmails},
+		                         mail_config=#{mailConfig}
+		limit 1
 	</update>
 	<select id="selectConfig" resultType="com.ruoyi.system.domain.DeployConfig">
 		select
 			svn_url svnUrl,
 			excel_skip_row excelSkipRow,
-			notify_emails notifyEmails
+			notify_emails notifyEmails,
+			mail_config mailConfig
 		from deploy_config
 	</select>
 

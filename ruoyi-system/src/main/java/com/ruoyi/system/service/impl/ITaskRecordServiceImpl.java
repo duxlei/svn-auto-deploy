@@ -7,6 +7,7 @@
  */
 package com.ruoyi.system.service.impl;
 
+import com.alibaba.fastjson2.JSON;
 import com.ruoyi.common.core.domain.entity.SysMenu;
 import com.ruoyi.common.core.redis.RedisCache;
 import com.ruoyi.common.exception.ServiceException;
@@ -20,6 +21,7 @@ import com.ruoyi.system.mapper.TaskLogMapper;
 import com.ruoyi.system.mapper.TaskRecordMapper;
 import com.ruoyi.system.service.ITaskRecordService;
 import com.ruoyi.system.service.deploy.DefaultDeployProcess;
+import com.ruoyi.system.service.deploy.DeployExecutor;
 import com.ruoyi.system.service.deploy.Env;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -54,6 +56,9 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
 
     @Autowired
     private DefaultDeployProcess deployProcess;
+
+    @Autowired
+    private DeployExecutor deployExecutor;
 
     @Override
     public List<TaskRecord> selectList(TaskRecordQueryVo queryVo) {
@@ -146,25 +151,26 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
         if (CollectionUtils.isEmpty(taskRecords)) {
             return 0;
         }
-        // TODO 获取当前分支上游的合并分支
+        // 获取当前分支上游的合并分支
         Env env = getEnv(envName);
 
-        // TODO 排队逻辑
-
+        // 排队逻辑（使用线程池排队）
         // 执行发布流程
-        try {
-            deployProcess.deploy(opt, env, taskRecords);
-        } catch (Exception e) {
-            if (e instanceof SVNException) {
-                SVNErrorCode errorCode = ((SVNException) e).getErrorMessage().getErrorCode();
-                if (SVNErrorCode.WC_SCHEDULE_CONFLICT.getCode() == errorCode.getCode() ||
-                    SVNErrorCode.WC_FOUND_CONFLICT.getCode() == errorCode.getCode()) {
-                    throw new RuntimeException("合并过程中出现冲突，请手动处理");
+        deployExecutor.runJob(() -> {
+            try {
+                deployProcess.deploy(opt, env, taskRecords);
+            } catch (Exception e) {
+                e.printStackTrace();
+                if (e instanceof SVNException) {
+                    SVNErrorCode errorCode = ((SVNException) e).getErrorMessage().getErrorCode();
+                    if (SVNErrorCode.WC_SCHEDULE_CONFLICT.getCode() == errorCode.getCode() ||
+                        SVNErrorCode.WC_FOUND_CONFLICT.getCode() == errorCode.getCode()) {
+                        throw new RuntimeException("合并过程中出现冲突，请手动处理");
+                    }
                 }
+                throw new RuntimeException("发布失败");
             }
-            e.printStackTrace();
-            throw new RuntimeException("发布失败");
-        }
+        });
 
         return taskIds.size();
     }
@@ -198,11 +204,19 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
 
     @Override
     public int saveConfig(DeployConfig config) {
+        config.setMailConfig(JSON.toJSONString(config.getMail()));
         return taskRecordMapper.saveConfig(config);
     }
 
     @Override
     public DeployConfig getConfig() {
-        return taskRecordMapper.selectConfig();
+        DeployConfig deployConfig = taskRecordMapper.selectConfig();
+        try {
+            DeployConfig.MailConfig mailConfig = JSON.parseObject(deployConfig.getMailConfig(), DeployConfig.MailConfig.class);
+            deployConfig.setMail(mailConfig == null ? new DeployConfig.MailConfig() : mailConfig);
+        } catch (Exception e) {
+            deployConfig.setMail(new DeployConfig.MailConfig());
+        }
+        return deployConfig;
     }
 }
