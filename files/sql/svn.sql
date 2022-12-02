@@ -47,8 +47,13 @@ create table if not exists deploy_config (
     svn_url         varchar(500)    not null comment 'SVN服务器地址',
     excel_skip_row  int             not null comment '导入excel跳过行数',
     notify_emails   varchar(2000)   not null default '' comment '发布通知邮件列表',
-    mail_config text not null comment '邮件服务器配置'
+    mail_config text not null comment '邮件服务器配置',
+    compile_cmd varchar(2000) not null comment '编译命令',
+    compile_wait int not null comment '编译等待时间(单位秒)'
 ) comment '发布配置表';
+
+alter table deploy_config add column compile_cmd varchar(2000) not null comment '编译命令';
+alter table deploy_config add column compile_wait int not null comment '编译等待时间(单位秒)';
 
 -- 菜单配置支持分支地址设置
 alter table sys_menu add column env_path  varchar(100)  default '' comment '分支地址';

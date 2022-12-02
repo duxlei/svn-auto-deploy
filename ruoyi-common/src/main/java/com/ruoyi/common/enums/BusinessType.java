@@ -61,4 +61,6 @@ public enum BusinessType
      * 发布
      */
     DEPLOY,
+
+    DEPLOY_CONFIG,
 }

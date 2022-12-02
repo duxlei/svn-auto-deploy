@@ -52,6 +52,18 @@
         <el-input v-model="form.mail.pass" type="password" />
       </el-form-item>
 
+      <br/>
+      <el-divider content-position="center">编译配置</el-divider>
+      <br/>
+      <el-form-item label="编译命令" prop="compileCmd">
+        <el-input v-model="form.compileCmd" placeholder="" />
+      </el-form-item>
+      <el-form-item label="编译等待时间" prop="compileWait">
+        <el-input v-model="form.compileWait" type="number" :min="3" :max="100">
+          <template slot="append">秒</template>
+        </el-input>
+      </el-form-item>
+
       <el-form-item>
         <el-button type="primary" @click="onSubmit">保存配置</el-button>
         <el-button>取消</el-button>
@@ -70,6 +82,8 @@ export default {
       form: {
         excelSkipRow: 3,
         svnUrl: '',
+        compileCmd: '',
+        compileWait: '',
         mail: {
           host: '',
           port: '',
@@ -97,6 +111,8 @@ export default {
       if (resp.code === 200) {
         this.form.svnUrl = resp.data.svnUrl.replaceAll("svn://", "")
         this.form.excelSkipRow = resp.data.excelSkipRow
+        this.form.compileCmd = resp.data.compileCmd
+        this.form.compileWait = resp.data.compileWait
         this.form.mail = resp.data.mail
         this.emailList = resp.data.notifyEmails ? resp.data.notifyEmails.split(',') : []
       }
@@ -113,6 +129,8 @@ export default {
           let param = {
             svnUrl: 'svn://' + this.form.svnUrl,
             excelSkipRow: this.form.excelSkipRow,
+            compileCmd: this.form.compileCmd,
+            compileWait: this.form.compileWait,
             mail: this.form.mail,
             notifyEmails: this.emailList.join(',')
           }

@@ -193,7 +193,7 @@ public class ITaskRecordServiceImpl implements ITaskRecordService {
         if (StringUtils.isEmpty(svnUrl)) {
             throw new RuntimeException("SVN仓库地址未配置");
         }
-        return new Env(envName, envPath, srcPath, svnUrl);
+        return new Env(envName, envPath, srcPath, svnUrl, config.getCompileCmd(), config.getCompileWait());
     }
 
     @Override

@@ -23,6 +23,9 @@ public class DeployConfig {
 
     private MailConfig mail;
 
+    private String compileCmd;
+    private Long compileWait;
+
     public String getSvnUrl() {
         return svnUrl;
     }
@@ -61,6 +64,22 @@ public class DeployConfig {
 
     public void setMail(MailConfig mail) {
         this.mail = mail;
+    }
+
+    public String getCompileCmd() {
+        return compileCmd;
+    }
+
+    public void setCompileCmd(String compileCmd) {
+        this.compileCmd = compileCmd;
+    }
+
+    public Long getCompileWait() {
+        return compileWait;
+    }
+
+    public void setCompileWait(Long compileWait) {
+        this.compileWait = compileWait;
     }
 
     public static class MailConfig {

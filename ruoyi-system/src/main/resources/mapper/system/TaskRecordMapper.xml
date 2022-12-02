@@ -151,7 +151,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		                         svn_url=#{svnUrl},
 		                         excel_skip_row=#{excelSkipRow},
 		                         notify_emails=#{notifyEmails},
-		                         mail_config=#{mailConfig}
+		                         mail_config=#{mailConfig},
+		                         compile_cmd=#{compileCmd},
+								 compile_wait=#{compileWait}
 		limit 1
 	</update>
 	<select id="selectConfig" resultType="com.ruoyi.system.domain.DeployConfig">
@@ -159,7 +161,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			svn_url svnUrl,
 			excel_skip_row excelSkipRow,
 			notify_emails notifyEmails,
-			mail_config mailConfig
+			mail_config mailConfig,
+			compile_cmd compileCmd,
+			compile_wait compileWait
 		from deploy_config
 	</select>
 

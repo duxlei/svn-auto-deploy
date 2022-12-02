@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -50,6 +51,7 @@ public class DefaultDeployProcess implements DeployProcess {
 //    public String SVN_REPO = "svn://192.168.56.100";
 
     public static File WORK_DIR = new File(SvnConstant.LOCAL_DIR);
+    public static File WORK_COMPILE = new File(SvnConstant.COMPILE_DIR);
     public static String USER_NAME = "duhg";
     public static String PASS_WD = "123456";
     public static String STATIC_PATH = "update";
@@ -86,7 +88,7 @@ public class DefaultDeployProcess implements DeployProcess {
         }
 
         // 3.执行编译脚本
-        boolean compileResult = compileDlls(taskRecords, env, STATIC_PATH);
+        boolean compileResult = compileDlls(deployTaskItems, env, STATIC_PATH);
         if (compileResult) {
             // 编译成功，更新发布任务状态已编译
             deployTaskItems.forEach(e -> e.setTaskStatus(TaskStatusEnum.COMPILED.val()));
@@ -130,6 +132,7 @@ public class DefaultDeployProcess implements DeployProcess {
         // 清除wc
         try {
             FileUtil.del(WORK_DIR);
+            FileUtil.del(WORK_COMPILE);
         } catch (Exception e) {
             return getExceptStack(e);
         }
@@ -385,36 +388,95 @@ public class DefaultDeployProcess implements DeployProcess {
     }
 
     /** 执行编译脚本 */
-    private boolean compileDlls(List<TaskRecord> taskRecords, Env env, String staticPath) {
-        // TODO 执行编译脚本
-//        List<String> allDlls = taskRecords.stream()
-//                .map(TaskRecord::getOutDlls)
-//                .filter(StringUtils::isNotEmpty)
-//                .map(dlls -> Arrays.stream(dlls.split(",")).collect(Collectors.toList()))
-//                .flatMap(Collection::stream)
-//                .distinct()
-//                .collect(Collectors.toList());
+    private boolean compileDlls(List<DeployTaskItem> deployTaskItems, Env env, String staticPath) {
 
-        String dateName = DateUtils.dateTime() + "-" + env.getName();
-        for (TaskRecord taskRecord : taskRecords) {
-            if (StringUtils.isEmpty(taskRecord.getOutDlls())) {
-                continue;
+        try {
+            List<TaskRecord> taskRecords = deployTaskItems.stream().map(DeployTaskItem::getTaskRecord).collect(Collectors.toList());
+//            Set<String> dlls = new HashSet<>();
+
+//            for (TaskRecord taskRecord : taskRecords) {
+//                if (StringUtils.isEmpty(taskRecord.getOutDlls())) {
+//                    continue;
+//                }
+//                String dirName = taskRecord.getPrincipal() + "-" + taskRecord.getJiraNo() + "-" + taskRecord.getDemandName();
+//                for (String dll : taskRecord.getOutDlls().split(",")) {
+//                    String fp = PathUtils.peekPath(staticPath, dateName, "dll", dll);
+//                    FileUtil.del(new File(WORK_DIR, fp));
+//                    File touch = FileUtil.touch(WORK_DIR, fp);
+//                    FileUtil.appendString(DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, new Date()), touch, CharsetUtil.UTF_8);
+//                }
+//                dlls.addAll(Arrays.stream(taskRecord.getOutDlls().split(",")).collect(Collectors.toList()));
+//            }
+
+            // 收集需要编译的dll
+            List<String> allDlls = taskRecords.stream()
+                    .map(TaskRecord::getOutDlls)
+                    .filter(StringUtils::isNotEmpty)
+                    .map(dlls -> Arrays.stream(dlls.split(",")).collect(Collectors.toList()))
+                    .flatMap(Collection::stream)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            File compileDir = new File(WORK_DIR, env.getPath());
+            FileUtil.copyContent(compileDir.toPath(), WORK_COMPILE.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            String slnPath = getSlnPath(WORK_COMPILE);
+            // 执行编译脚本
+            for (String dll : allDlls) {
+                String cmd = env.getCompileCmd() + " " + slnPath + " /Project " + dll + " /rebuild";
+                System.out.println(cmd);
+                Runtime.getRuntime().exec("cmd /c " + cmd);
             }
-            String dirName = taskRecord.getPrincipal() + "-" + taskRecord.getJiraNo() + "-" + taskRecord.getDemandName();
-            for (String dll : taskRecord.getOutDlls().split(",")) {
-                String fp = PathUtils.peekPath(staticPath, dateName, "dll", dll);
-                FileUtil.del(new File(WORK_DIR, fp));
-                File touch = FileUtil.touch(WORK_DIR, fp);
-                FileUtil.appendString(DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, new Date()), touch, CharsetUtil.UTF_8);
+
+            // 等待一段时间编译完成
+            Thread.sleep(env.getCompileWait() * 1000);
+
+            // 复制Dll文件
+            String dateName = DateUtils.dateTime() + "-" + env.getName();
+            for (String dll : allDlls) {
+                String src = PathUtils.peekPath("Debug", dll + ".dll");
+                File srcFile = new File(WORK_COMPILE, src);
+                if (!srcFile.exists()) {
+                    src = PathUtils.peekPath("x64", "Debug", dll + ".dll");
+                    srcFile = new File(WORK_COMPILE, src);
+                    if (!srcFile.exists()) {
+                        throw new RuntimeException(dll + ".dll 未编译成功");
+                    }
+                }
+                String dest = PathUtils.peekPath(staticPath, dateName, "dll", dll + ".dll");
+                File destFile = new File(WORK_DIR, dest);
+                FileUtil.del(destFile);
+                FileUtil.copyFile(srcFile, destFile);
             }
+        } catch (Exception e) {
+            for (DeployTaskItem taskItem : deployTaskItems) {
+                taskItem.setLog(e.getMessage());
+            }
+            e.printStackTrace();
+            return false;
         }
-
         return true;
     }
+    private String getSlnPath(File dir) {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            throw new RuntimeException("编译DLL时未找到sln目录");
+        }
+        String slnPath = "";
+        for (File file : files) {
+            if (file.getName().endsWith(".sln")) {
+                slnPath = file.getAbsolutePath();
+                break;
+            }
+        }
+        if (StringUtils.isEmpty(slnPath)) {
+            throw new RuntimeException("编译DLL时未找到sln目录");
+        }
+        return slnPath;
+    }
 
-    /** TODO 发布失败发送邮件 */
+    /** 发布失败发送邮件 */
     private void sendNotifyEmail(List<DeployTaskItem> deployTaskItems, Env env, String msg) {
-        // TODO 发送通知邮件
+        // 发送通知邮件
         DeployConfig deployConfig = taskRecordMapper.selectConfig();
         if (deployConfig == null) {
             log.error("未配置发布信息");
@@ -431,18 +493,13 @@ public class DefaultDeployProcess implements DeployProcess {
             StringBuilder content = new StringBuilder("<pre>");
             deployTaskItems.forEach(e -> {
                 // 合并Commit
-//                StringBuffer sb = new StringBuffer();
-//                for (SVNLogEntry logEntry : e.getLogEntries()) {
-//                    // 解析提交日志
-//                    sb.append(parseLog(logEntry));
-//                }
                 content.append(String.format("JIRA：%s\n需求名：%s\n", e.getTaskRecord().getJiraNo(), e.getTaskRecord().getDemandName()));
                 content.append("vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv\n");
                 content.append(e.getLog());
                 content.append("\n");
             });
             content.append("</pre>");
-            sendMail(mailConfig, emails, title, content.toString());
+//            sendMail(mailConfig, emails, title, content.toString());
         } catch (Exception e) {
             log.warn("发送通知邮件失败", e);
         }

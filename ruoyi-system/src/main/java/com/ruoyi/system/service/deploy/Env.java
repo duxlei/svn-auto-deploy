@@ -21,11 +21,19 @@ public class Env {
     /** 远程仓库地址 */
     private String repoUrl;
 
-    public Env(String name, String path, String srcPath, String repoUrl) {
+    /** 编译命令 */
+    private String compileCmd;
+
+    /** 编译等待时间(单位秒) */
+    private Long compileWait;
+
+    public Env(String name, String path, String srcPath, String repoUrl, String compileCmd, Long compileWait) {
         this.name = name;
         this.path = path;
         this.srcPath = srcPath;
         this.repoUrl = repoUrl;
+        this.compileCmd = compileCmd;
+        this.compileWait = compileWait;
     }
 
     public String getName() {
@@ -58,5 +66,21 @@ public class Env {
 
     public void setRepoUrl(String repoUrl) {
         this.repoUrl = repoUrl;
+    }
+
+    public String getCompileCmd() {
+        return compileCmd;
+    }
+
+    public void setCompileCmd(String compileCmd) {
+        this.compileCmd = compileCmd;
+    }
+
+    public Long getCompileWait() {
+        return compileWait;
+    }
+
+    public void setCompileWait(Long compileWait) {
+        this.compileWait = compileWait;
     }
 }
